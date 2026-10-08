@@ -22,6 +22,7 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { formatDate, formatMoney } from '@/ui/format';
+import { GamesSection } from '@/ui/games/GamesSection';
 import { colors, fontSize, radius, spacing } from '@/ui/theme';
 
 type SettlementMode = 'min' | 'direct';
@@ -163,11 +164,7 @@ export default function JuntadaDetailScreen() {
         </View>
 
         {tab === 'games' ? (
-          <EmptyState
-            icon="game-controller-outline"
-            message="Próximamente: Truco, Generala, Skull King y más."
-            title="Juegos"
-          />
+          <GamesSection getTogetherId={id ?? ''} />
         ) : (
           <>
             <View style={styles.sectionRow}>

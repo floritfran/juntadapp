@@ -19,8 +19,10 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Settlement: direct payments or debt minimization (default)
 - Juntadas list with date, participants and total spent
 - SQLite persistence with migrations
-
-Games module: not started.
+- Games module (per juntada, multiple matches per game, live scorer + stored history):
+  - Truco: team score to 30 (15 malas + 15 buenas), 1v1/2v2/3v3 with team assignment, one form with a points input per team per hand, undo last hand
+  - Generala: one play per player (the turn passes to the next player after each entry), standard Argentine sheet (upper bonus 35 at 63+, fixed lower values), tachar any box, editable entries
+  - Skull King: 10 rounds of one card per player each (round N deals N cards), bid + tricks per player, automatic scoring (exact bid 0 = 10 x round, exact bid N = 20 x N, miss = -10 per unit), combat bonus presets and free +/- bonuses, round history with undo
 
 ## Requirements
 
