@@ -12,6 +12,7 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { formatDate } from '@/ui/format';
 import { GeneralaScorer } from '@/ui/games/GeneralaScorer';
+import { GenericScorer } from '@/ui/games/GenericScorer';
 import { SkullKingScorer } from '@/ui/games/SkullKingScorer';
 import { TrucoScorer } from '@/ui/games/TrucoScorer';
 import { colors, fontSize, spacing } from '@/ui/theme';
@@ -103,6 +104,7 @@ const nameOf = (personId: string) => nameById.get(personId) ?? 'Persona eliminad
         {match.game === 'truco' ? <TrucoScorer key={match.id} match={match} nameOf={nameOf} onStatusChange={handleStatusChange} /> : null}
         {match.game === 'generala' ? <GeneralaScorer key={match.id} match={match} nameOf={nameOf} onStatusChange={handleStatusChange} /> : null}
         {match.game === 'skull-king' ? <SkullKingScorer key={match.id} match={match} nameOf={nameOf} onStatusChange={handleStatusChange} /> : null}
+        {match.game === 'generic' ? <GenericScorer key={match.id} match={match} nameOf={nameOf} onStatusChange={handleStatusChange} /> : null}
       </ScrollView>
     </Screen>
   );

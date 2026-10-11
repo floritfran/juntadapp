@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "juntadapp",
+    "name": "Juntadapp",
     "slug": "juntadapp",
     "scheme": "juntadapp",
     "experiments": {
@@ -8,22 +8,22 @@
     },
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/juntadapp.jpg",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
     },
     "android": {
+      "package": "com.juntadapp.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/juntadapp.jpg",
+        "monochromeImage": "./assets/juntadapp-b&w.jpg"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/juntadapp.jpg"
     },
     "plugins": [
       "expo-sqlite",

@@ -46,7 +46,9 @@
     "web": "expo start --web",
     "test": "jest --no-coverage",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:apk": "npx eas-cli@latest build -p android --profile preview",
+    "build:android": "npx eas-cli@latest build -p android --profile production"
   },
   "private": true
 }

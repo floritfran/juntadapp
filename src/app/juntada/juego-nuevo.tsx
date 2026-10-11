@@ -18,7 +18,7 @@ import { Screen } from '@/ui/components/Screen';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { colors, fontSize, spacing } from '@/ui/theme';
 
-const GAMES: GameId[] = ['truco', 'generala', 'skull-king'];
+const GAMES: GameId[] = ['truco', 'generala', 'skull-king', 'generic'];
 const TEAM_SIZES: TrucoTeamSize[] = [1, 2, 3];
 
 function defaultTeams(ids: string[], teamSize: TrucoTeamSize): Record<string, TrucoTeam> {
@@ -116,6 +116,10 @@ export default function NuevaPartidaScreen() {
     }
     if (game === 'skull-king' && selectedIds.length < 2) {
       Alert.alert('Sin jugadores', 'Skull King necesita al menos 2 jugadores.');
+      return;
+    }
+    if (game === 'generic' && selectedIds.length < 2) {
+      Alert.alert('Sin jugadores', 'El juego genérico necesita al menos 2 jugadores.');
       return;
     }
     if (game === 'truco') {

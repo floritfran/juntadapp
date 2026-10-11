@@ -70,7 +70,7 @@ docs/adr         - architectural decision records (none yet)
 - Expense (id, getTogetherId, payerId, description, amountInt, participantIds, timestamps, deletedAt)
 - Balance (personId, net = paid - owes)
 - Transfer (from, to, amount)
-- Match (id, getTogetherId, game truco|generala|skull-king, status active|finished, teamSize for truco, players snapshot with team, timestamps)
+- Match (id, getTogetherId, game truco|generala|skull-king|generic, status active|finished, teamSize for truco, players snapshot with team, timestamps)
 - Game-specific: TrucoRound (team1Points, team2Points), GeneralaEntry (box, points, tachado), SkullKingRoundEntry (round, bid, tricks, bonus)
 
 ## Data Model (SQLite, migrations v1 + v2 + v3)
@@ -235,7 +235,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the
 - Expense domain + tests passing
 - SQLite schema/migrations (v1 + v2 + v3) + repositories done
 - Basic UI done: juntadas list, create juntada, juntada detail with expenses and settlement, people/groups management
-- Games module done: Truco, Generala and Skull King (domain + tests, migration v2, repositories, setup screen, scorers, match list in the Juegos tab)
+- Games module: Truco, Generala, Skull King and a new generic scorekeeper (domain + tests, migration v4, repository, setup screen, scorer, match list in the Juegos tab)
 - Verified: `npm test` (48 passing), `npm run lint`, `npm run typecheck`
 
 Next steps: edit/close juntadas + date picker, then game statistics.

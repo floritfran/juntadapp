@@ -137,6 +137,19 @@ DROP TABLE truco_rounds;
 ALTER TABLE truco_rounds_v3 RENAME TO truco_rounds;
 `,
   },
+  {
+    version: 4,
+    sql: `
+CREATE TABLE generic_adjustments (
+  id TEXT PRIMARY KEY NOT NULL,
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  person_id TEXT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+  points INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX idx_generic_adjustments_match ON generic_adjustments(match_id);
+`,
+  },
 ];
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {

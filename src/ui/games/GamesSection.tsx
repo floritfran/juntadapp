@@ -7,7 +7,9 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { GAME_LABELS, Match, TrucoTeam } from '@/domain/games/game-types';
 import { computeTrucoScore } from '@/domain/games/truco/truco-scorer';
 import { computeGeneralaTotals, generalaWinners } from '@/domain/games/generala/generala-scorer';
+import { genericTotals } from '@/domain/games/generic/generic-scorer';
 import { skullKingTotals } from '@/domain/games/skull-king/skull-king-scorer';
+import { listGenericAdjustments } from '@/infrastructure/persistence/generic-repository';
 import { listGeneralaEntries } from '@/infrastructure/persistence/generala-repository';
 import { deleteMatch, listMatches } from '@/infrastructure/persistence/matches-repository';
 import { listAllPeople } from '@/infrastructure/persistence/people-repository';
@@ -91,7 +93,7 @@ export function GamesSection({ getTogetherId }: Props) {
       {cards.length === 0 ? (
         <EmptyState
           icon="game-controller-outline"
-          message="Elegí Truco, Generala o Skull King y cargá los jugadores para empezar."
+          message="Elegí Truco, Generala, Skull King o Juego genérico y cargá los jugadores para empezar."
           title="Sin partidas todavía"
         />
       ) : (
@@ -162,6 +164,18 @@ async function summarize(
       return `${winners.length > 1 ? 'Empataron' : 'Ganó'} ${who} · ${best} pts`;
     }
     return `${entries.length}/${order.length * 11} casilleros cargados`;
+  }
+  if (match.game === 'generic') {
+    const adjustments = await listGenericAdjustments(db, match.id);
+    const totals = genericTotals(
+      match.players.map((player) => player.personId),
+      adjustments
+    );
+    const line = totals.map((row) => `${nameOf(row.personId)} ${row.total}`).join(' · ');
+    if (match.status === 'finished' && totals.length > 0) {
+      return `Ganó ${nameOf(totals[0].personId)} · ${line}`;
+    }
+    return totals.length > 0 && adjustments.length > 0 ? line : 'Sin puntos todavía';
   }
   const entries = await listSkullKingEntries(db, match.id);
   const totals = skullKingTotals(entries);

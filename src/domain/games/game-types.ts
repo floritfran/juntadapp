@@ -6,12 +6,13 @@ export type { PersonId } from '../people/person-types';
 
 export type MatchId = string;
 
-export type GameId = 'truco' | 'generala' | 'skull-king';
+export type GameId = 'truco' | 'generala' | 'skull-king' | 'generic';
 
 export const GAME_LABELS: Record<GameId, string> = {
   truco: 'Truco',
   generala: 'Generala',
   'skull-king': 'Skull King',
+  generic: 'Juego genérico',
 };
 
 export type MatchStatus = 'active' | 'finished';
