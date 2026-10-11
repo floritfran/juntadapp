@@ -8,7 +8,7 @@
     },
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/juntadapp.jpg",
+    "icon": "./assets/juntadapp.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true
@@ -17,13 +17,13 @@
       "package": "com.juntadapp.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/juntadapp.jpg",
-        "monochromeImage": "./assets/juntadapp-b&w.jpg"
+        "foregroundImage": "./assets/juntadapp.png",
+        "monochromeImage": "./assets/juntadapp-b&w.png"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/juntadapp.jpg"
+      "favicon": "./assets/juntadapp.png"
     },
     "plugins": [
       "expo-sqlite",
