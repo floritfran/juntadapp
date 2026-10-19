@@ -204,6 +204,18 @@ export default function JuntadaDetailScreen() {
                     <Text style={styles.expenseAmount}>{formatMoney(expense.amountInt)}</Text>
                     <Pressable
                       hitSlop={8}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/juntada/gasto-editar',
+                          params: { id: id ?? '', expenseId: expense.id },
+                        })
+                      }
+                      style={styles.iconButton}
+                    >
+                      <Ionicons color={colors.primary} name="pencil-outline" size={20} />
+                    </Pressable>
+                    <Pressable
+                      hitSlop={8}
                       onPress={() => confirmDeleteExpense(expense)}
                       style={styles.iconButton}
                     >

@@ -23,6 +23,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="juntada/nueva" options={{ title: 'Nueva juntada', presentation: 'modal' }} />
           <Stack.Screen name="juntada/gasto-nuevo" options={{ title: 'Nuevo gasto', presentation: 'modal' }} />
+          <Stack.Screen name="juntada/gasto-editar" options={{ title: 'Editar gasto', presentation: 'modal' }} />
           <Stack.Screen name="juntada/juego-nuevo" options={{ title: 'Nueva partida', presentation: 'modal' }} />
           <Stack.Screen name="juntada/partida" options={{ title: 'Partida' }} />
           <Stack.Screen name="juntada/[id]" options={{ title: 'Juntada' }} />

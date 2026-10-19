@@ -19,6 +19,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 - Friend groups (create with members, list, soft delete)
 - Create a juntada: name, today's date, participants (manual selection or loaded from a saved group, then adjustable)
 - Record expenses: description, amount, payer, subset of participants
+- Edit an existing expense (description, amount, payer, participants); settlements recompute automatically
 - Equal split with deterministic integer remainder
 - Settlement with two modes: direct payments and debt minimization (default)
 - Juntada detail: expenses list, totals, transfers, balances
@@ -144,6 +145,7 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 Stack (root)
 ├── juntada/nueva        - create juntada (modal)
 ├── juntada/gasto-nuevo  - add expense (modal, ?id= getTogether)
+├── juntada/gasto-editar - edit expense (modal, ?id= getTogether, ?expenseId=)
 ├── juntada/juego-nuevo  - start match (modal, ?id= getTogether, ?game= preselect)
 ├── juntada/partida      - match scorer/history (?match= matchId)
 └── juntada/[id]         - detail with segmented Gastos | Juegos
@@ -181,7 +183,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the
 ## Known Limitations
 
 - Juntada date is always today (no date picker yet)
-- Cannot edit a juntada, its participants or its expenses (delete + re-create only)
+- Cannot edit a juntada or its participants (delete + re-create only)
 - Cannot close/reopen a juntadas; status column exists but is always `active`
 - Groups cannot be edited after creation (create/delete only)
 - Web not configured or tested

@@ -61,3 +61,25 @@ describe('expenses - division igualitaria', () => {
     expect(direct.length).toBeGreaterThan(0);
   });
 });
+
+describe('expenses - edicion', () => {
+  test('editing the amount recomputes balances', () => {
+    const original = exp('e1', p('a'), 30, [p('a'), p('b')]);
+    const before = calculateBalances([original]);
+    expect(before.find((b) => b.personId === p('a'))?.net).toBe(15);
+
+    const edited = exp('e1', p('a'), 10, [p('a'), p('b')], { amountInt: 10 });
+    const after = calculateBalances([edited]);
+    expect(after.find((b) => b.personId === p('a'))?.net).toBe(5);
+    expect(after.find((b) => b.personId === p('b'))?.net).toBe(-5);
+  });
+
+  test('editing the payer and participants recomputes balances', () => {
+    const edited = exp('e1', p('b'), 30, [p('b'), p('c')]);
+    const bals = calculateBalances([edited]);
+    const m: Record<string, number> = {};
+    bals.forEach((b) => (m[b.personId] = b.net));
+    expect(m[p('b')]).toBe(15);
+    expect(m[p('c')]).toBe(-15);
+  });
+});

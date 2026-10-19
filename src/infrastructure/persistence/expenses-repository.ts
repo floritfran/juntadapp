@@ -108,6 +108,56 @@ export async function createExpense(
   return expense;
 }
 
+export async function getExpense(db: SQLiteDatabase, id: ExpenseId): Promise<Expense | null> {
+  const row = await db.getFirstAsync<ExpenseRow>(
+    'SELECT * FROM expenses WHERE id = ? AND deleted_at IS NULL',
+    id
+  );
+  if (!row) return null;
+  const links = await db.getAllAsync<ParticipantLinkRow>(
+    'SELECT expense_id, person_id FROM expense_participants WHERE expense_id = ? ORDER BY position ASC',
+    id
+  );
+  return rowToExpense(
+    row,
+    links.map((link) => link.person_id)
+  );
+}
+
+export async function updateExpense(
+  db: SQLiteDatabase,
+  id: ExpenseId,
+  input: {
+    payerId: PersonId;
+    description: string;
+    amountInt: number;
+    participantIds: PersonId[];
+  }
+): Promise<void> {
+  const now = Date.now();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE expenses
+          SET payer_id = ?, description = ?, amount_int = ?, updated_at = ?
+        WHERE id = ? AND deleted_at IS NULL`,
+      input.payerId,
+      input.description.trim(),
+      input.amountInt,
+      now,
+      id
+    );
+    await db.runAsync('DELETE FROM expense_participants WHERE expense_id = ?', id);
+    for (let position = 0; position < input.participantIds.length; position++) {
+      await db.runAsync(
+        'INSERT INTO expense_participants (expense_id, person_id, position) VALUES (?, ?, ?)',
+        id,
+        input.participantIds[position],
+        position
+      );
+    }
+  });
+}
+
 export async function softDeleteExpense(db: SQLiteDatabase, id: ExpenseId): Promise<void> {
   const now = Date.now();
   await db.runAsync('UPDATE expenses SET deleted_at = ?, updated_at = ? WHERE id = ?', now, now, id);
