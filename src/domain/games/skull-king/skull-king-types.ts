@@ -11,7 +11,7 @@ export interface SkullKingRoundEntry {
 }
 
 export const COMBAT_BONUSES = [
-  { id: 'siren-beats-sk', label: 'Sirena > Skull King', points: 50 },
+  { id: 'siren-beats-sk', label: 'Sirena > Skull King', points: 40 },
   { id: 'pirate-beats-siren', label: 'Pirata > Sirena', points: 20 },
   { id: 'sk-beats-pirate', label: 'Skull King > Pirata', points: 30 },
 ] as const;

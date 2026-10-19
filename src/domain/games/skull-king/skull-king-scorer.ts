@@ -31,6 +31,9 @@ export function validateSkullKingEntry(entry: SkullKingRoundEntry): void {
 export function skullKingRoundPoints(entry: SkullKingRoundEntry): number {
   validateSkullKingRound(entry.round);
   if (entry.bid !== entry.tricks) {
+    if (entry.bid === 0) {
+      return -MISS_PENALTY_PER_UNIT * entry.round;
+    }
     return -MISS_PENALTY_PER_UNIT * Math.abs(entry.bid - entry.tricks);
   }
   const base = entry.bid === 0 ? EXACT_ZERO_BID_POINTS_PER_ROUND * entry.round : EXACT_BID_POINTS_PER_UNIT * entry.bid;

@@ -41,8 +41,11 @@ describe('skull king - fallo', () => {
     expect(skullKingRoundPoints(sk(6, 'a', 1, 4))).toBe(-30);
   });
 
-  test('bid 0 with tricks lost is penalized', () => {
-    expect(skullKingRoundPoints(sk(4, 'a', 0, 2))).toBe(-20);
+  test('bid 0 with tricks lost is penalized 10 per round played', () => {
+    expect(skullKingRoundPoints(sk(1, 'a', 0, 1))).toBe(-10);
+    expect(skullKingRoundPoints(sk(4, 'a', 0, 2))).toBe(-40);
+    expect(skullKingRoundPoints(sk(4, 'a', 0, 3))).toBe(-40);
+    expect(skullKingRoundPoints(sk(10, 'a', 0, 5))).toBe(-100);
   });
 
   test('bonuses are ignored on a miss', () => {
