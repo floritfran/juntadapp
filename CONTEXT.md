@@ -58,7 +58,7 @@ UI (src/app, Expo Router screens)
 - Expo Router (file-based routing, typed routes enabled) - routes in `src/app`
 - expo-sqlite (`SQLiteProvider` + `onInit` migration hook)
 - expo-crypto (UUIDs), dayjs (dates)
-- Jest + ts-jest (domain tests), ESLint with `eslint-config-expo`
+- Jest + jest-expo (babel-preset-expo transform; no ts-jest) for domain tests, ESLint with `eslint-config-expo`
 - Installed but not used yet: Zustand, zod, react-hook-form (reserved for shared state and form validation when needed)
 
 ## Folder Structure
