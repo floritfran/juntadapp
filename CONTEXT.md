@@ -26,6 +26,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 - Juntada detail: expenses list, totals, transfers, balances
 - Juntadas list with date, participant count and total spent
 - SQLite persistence with migrations
+- Light/dark theme that follows the active device color scheme
 - Games module: matches per juntada (Truco, Generala, Skull King) with live scorer, history and multiple matches per game
 
 ## Architecture
@@ -40,13 +41,24 @@ UI (src/app, Expo Router screens)
 - SQLite is the single source of truth. Screens read on focus (`useFocusEffect`) instead of keeping a client-side cache.
 - IDs generated with `expo-crypto.randomUUID()` in `src/infrastructure/id.ts`.
 
+## Theming
+
+- `src/ui/theme.tsx` holds the palettes (`lightColors`, `darkColors`), the `spacing`/`radius`/`fontSize` scales, and the theme context.
+- `ThemeProvider` (mounted in `src/app/_layout.tsx`, outside the navigation tree) reads the device scheme with `useColorScheme()` and exposes the matching palette through `useColors()` / `useTheme()`.
+- Screens and components never import a static palette. The pattern is:
+  - `const makeStyles = (colors: Colors) => StyleSheet.create({ ... })` at module scope.
+  - Inside each component: `const colors = useColors(); const styles = useMemo(() => makeStyles(colors), [colors]);` (or a local `useStyles()` helper when several components share the same styles).
+  - Inline color props (e.g. `ActivityIndicator color={colors.primary}`) read from the hook too.
+- `StatusBar` uses `style="auto"` so its text adapts to the active scheme.
+- `app.json` sets `userInterfaceStyle: "automatic"` so native UI follows the device theme.
+
 ## Tech Stack
 
 - Expo SDK 57, React Native 0.86, TypeScript (strict)
 - Expo Router (file-based routing, typed routes enabled) - routes in `src/app`
 - expo-sqlite (`SQLiteProvider` + `onInit` migration hook)
 - expo-crypto (UUIDs), dayjs (dates)
-- Jest + ts-jest (domain tests), ESLint with `eslint-config-expo`
+- Jest + jest-expo (babel-preset-expo transform; no ts-jest) for domain tests, ESLint with `eslint-config-expo`
 - Installed but not used yet: Zustand, zod, react-hook-form (reserved for shared state and form validation when needed)
 
 ## Folder Structure
@@ -186,6 +198,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the
 - Domain kept separate from UI and persistence
 - Expo Router over React Navigation (project instruction in AGENTS.md; decided while no navigation code existed yet)
 - IDs via `expo-crypto` instead of `uuid` (Expo-recommended module)
+- Theming via React context + `useColorScheme()` (device-driven); no in-app theme toggle and no manual color values outside `theme.tsx`
 
 ## Known Limitations
 
@@ -236,7 +249,8 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the
 - `diseño.md` - original product requirements (Spanish)
 - `src/domain/expenses/expense-calculator.ts` - splits, balances, transfers
 - `src/infrastructure/persistence/migrations.ts` - schema versions
-- `src/app/_layout.tsx` - root layout (SQLiteProvider + Stack)
+- `src/app/_layout.tsx` - root layout (SQLiteProvider + ThemeProvider + Stack)
+- `src/ui/theme.tsx` - light/dark palettes, spacing scale, ThemeProvider + useColors
 
 ## Current Project Status
 
@@ -245,6 +259,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the
 - SQLite schema/migrations (v1 + v2 + v3) + repositories done
 - Basic UI done: juntadas list, create juntada, juntada detail with expenses and settlement, people/groups management
 - Games module: Truco, Generala, Skull King and a new generic scorekeeper (domain + tests, migration v4, repository, setup screen, scorer, match list in the Juegos tab)
-- Verified: `npm test` (48 passing), `npm run lint`, `npm run typecheck`
+- Light/dark theme follows the device color scheme (theme context + `userInterfaceStyle: automatic`)
+- Verified: `npm run lint`, `npm run typecheck` (jest is temporarily broken by a pre-existing `expo-modules-core`/`expo-router` type conflict in the test transform)
 
 Next steps: edit/close juntadas + date picker, then game statistics.

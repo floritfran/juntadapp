@@ -24,12 +24,14 @@ import { Screen } from '@/ui/components/Screen';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { formatDate, formatMoney } from '@/ui/format';
 import { GamesSection } from '@/ui/games/GamesSection';
-import { colors, fontSize, radius, spacing } from '@/ui/theme';
+import { fontSize, radius, spacing, useColors, type Colors } from '@/ui/theme';
 
 type SettlementMode = 'min' | 'direct';
 type DetailTab = 'expenses' | 'games';
 
 export default function JuntadaDetailScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const { id } = useLocalSearchParams<{ id: string }>();
   const [getTogether, setGetTogether] = useState<GetTogether | null>(null);
@@ -357,7 +359,7 @@ export default function JuntadaDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   loading: {
     flex: 1,
     alignItems: 'center',
@@ -401,7 +403,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   segment: {
-    backgroundColor: '#EEF0F4',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.md,
     flexDirection: 'row',
     marginBottom: spacing.lg,

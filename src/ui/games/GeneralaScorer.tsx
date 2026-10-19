@@ -25,7 +25,7 @@ import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
   match: Match;
@@ -40,6 +40,8 @@ interface EditingState {
 }
 
 export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const order = useMemo(() => match.players.map((player) => player.personId), [match.players]);
   const [entries, setEntries] = useState<GeneralaPlayerEntry[] | null>(null);
@@ -278,7 +280,7 @@ function boxLabel(box: GeneralaBox): string {
   return GENERALA_BOX_LABELS[box];
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   turnBanner: {
     backgroundColor: colors.primarySoft,
     borderRadius: 12,

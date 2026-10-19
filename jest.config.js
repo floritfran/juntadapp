@@ -1,8 +1,5 @@
 module.exports = {
   preset: 'jest-expo',
-  transform: {
-    '^.+\\.(ts|tsx)$': 'ts-jest',
-  },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   testMatch: ['**/tests/**/*.test.(ts|tsx)'],
   collectCoverageFrom: [

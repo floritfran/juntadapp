@@ -16,7 +16,7 @@ import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
   match: Match;
@@ -25,6 +25,8 @@ interface Props {
 }
 
 export function GenericScorer({ match, nameOf, onStatusChange }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const playerIds = useMemo(() => match.players.map((player) => player.personId), [match.players]);
   const [entries, setEntries] = useState<GenericAdjustment[] | null>(null);
@@ -183,7 +185,7 @@ export function GenericScorer({ match, nameOf, onStatusChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   winnerBanner: {
     backgroundColor: colors.success,
     borderRadius: 12,

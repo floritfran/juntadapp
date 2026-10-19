@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
-import { colors, fontSize, radius, spacing } from '../theme';
+import { fontSize, radius, spacing, useColors, type Colors } from '../theme';
 
 interface Props extends Pick<TextInputProps, 'keyboardType' | 'autoCapitalize' | 'returnKeyType' | 'onSubmitEditing'> {
   label: string;
@@ -21,6 +22,8 @@ export function TextField({
   returnKeyType,
   onSubmitEditing,
 }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
@@ -40,7 +43,7 @@ export function TextField({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   wrapper: {
     marginBottom: spacing.lg,
   },

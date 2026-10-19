@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { colors, fontSize, spacing } from '../theme';
+import { fontSize, spacing, useColors, type Colors } from '../theme';
 
 interface Props {
   label: string;
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export function CheckRow({ label, checked, onToggle }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable
       accessibilityRole="checkbox"
@@ -21,7 +24,7 @@ export function CheckRow({ label, checked, onToggle }: Props) {
         {label}
       </Text>
       <Ionicons
-        color={checked ? colors.primary : '#9CA3AF'}
+        color={checked ? colors.primary : colors.iconMuted}
         name={checked ? 'checkmark-circle' : 'ellipse-outline'}
         size={26}
       />
@@ -29,7 +32,7 @@ export function CheckRow({ label, checked, onToggle }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',

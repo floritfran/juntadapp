@@ -26,7 +26,7 @@ import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
   match: Match;
@@ -49,6 +49,7 @@ function Stepper({
   max: number;
   onChange: (next: number) => void;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.stepper}>
       <Pressable onPress={() => onChange(Math.max(0, value - 1))} style={styles.stepButton}>
@@ -63,6 +64,8 @@ function Stepper({
 }
 
 export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
+  const colors = useColors();
+  const styles = useStyles();
   const db = useSQLiteContext();
   const playerIds = useMemo(() => match.players.map((player) => player.personId), [match.players]);
   const [entries, setEntries] = useState<SkullKingRoundEntry[] | null>(null);
@@ -362,7 +365,7 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   progressRow: {
     backgroundColor: colors.primarySoft,
     borderRadius: 12,
@@ -556,3 +559,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
+
+const useStyles = () => {
+  const colors = useColors();
+  return useMemo(() => makeStyles(colors), [colors]);
+};

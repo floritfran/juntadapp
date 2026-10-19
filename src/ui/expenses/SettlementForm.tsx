@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -12,7 +12,7 @@ import { Screen } from '@/ui/components/Screen';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { formatMoney, groupDigits, parseAmountToInt } from '@/ui/format';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface SettlementFormProps {
   getTogetherId: string;
@@ -31,6 +31,8 @@ export function SettlementForm({
   initialToId = null,
   initialAmountInt = 0,
 }: SettlementFormProps) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [fromId, setFromId] = useState<PersonId | null>(initialFromId ?? participantIds[0] ?? null);
   const [toId, setToId] = useState<PersonId | null>(
@@ -134,6 +136,9 @@ export function SettlementForm({
 }
 
 export function SettlementFormLoading() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Screen>
       <View style={styles.loading}>
@@ -143,7 +148,7 @@ export function SettlementFormLoading() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   loading: {
     flex: 1,
     alignItems: 'center',
