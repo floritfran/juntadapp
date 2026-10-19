@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleProp, StyleSheet, Text, ViewStyle } from 'react-native';
 
-import { colors, fontSize, radius, spacing } from '../theme';
+import { fontSize, radius, spacing, useColors, type Colors } from '../theme';
 
 type Variant = 'primary' | 'secondary' | 'danger';
 
@@ -13,19 +14,9 @@ interface Props {
   style?: StyleProp<ViewStyle>;
 }
 
-const containerByVariant: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: colors.primarySoft },
-  danger: { backgroundColor: colors.danger },
-};
-
-const labelByVariant: Record<Variant, string> = {
-  primary: colors.onPrimary,
-  secondary: colors.primary,
-  danger: colors.onPrimary,
-};
-
 export function Button({ title, onPress, variant = 'primary', disabled, loading, style }: Props) {
+  const colors = useColors();
+  const { containerByVariant, labelByVariant, styles } = useMemo(() => makeStyles(colors), [colors]);
   const isDisabled = Boolean(disabled || loading);
   const labelColor = labelByVariant[variant];
   return (
@@ -50,22 +41,38 @@ export function Button({ title, onPress, variant = 'primary', disabled, loading,
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 52,
-    borderRadius: radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  label: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  pressed: {
-    opacity: 0.8,
-  },
-});
+const makeStyles = (colors: Colors) => {
+  const containerByVariant: Record<Variant, ViewStyle> = {
+    primary: { backgroundColor: colors.primary },
+    secondary: { backgroundColor: colors.primarySoft },
+    danger: { backgroundColor: colors.danger },
+  };
+
+  const labelByVariant: Record<Variant, string> = {
+    primary: colors.onPrimary,
+    secondary: colors.primary,
+    danger: colors.onPrimary,
+  };
+
+  const styles = StyleSheet.create({
+    base: {
+      minHeight: 52,
+      borderRadius: radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    label: {
+      fontSize: fontSize.lg,
+      fontWeight: '600',
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    pressed: {
+      opacity: 0.8,
+    },
+  });
+
+  return { containerByVariant, labelByVariant, styles };
+};

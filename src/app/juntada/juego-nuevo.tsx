@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -16,7 +16,7 @@ import { Chip } from '@/ui/components/Chip';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { SectionTitle } from '@/ui/components/SectionTitle';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 const GAMES: GameId[] = ['truco', 'generala', 'skull-king', 'generic'];
 const TEAM_SIZES: TrucoTeamSize[] = [1, 2, 3];
@@ -30,6 +30,8 @@ function defaultTeams(ids: string[], teamSize: TrucoTeamSize): Record<string, Tr
 }
 
 export default function NuevaPartidaScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const { id, game: gameParam } = useLocalSearchParams<{ id: string; game?: string }>();
   const [people, setPeople] = useState<Person[]>([]);
@@ -272,7 +274,7 @@ export default function NuevaPartidaScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   loading: {
     flex: 1,
     alignItems: 'center',

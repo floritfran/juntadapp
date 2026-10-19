@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import { ComponentProps, ReactNode } from 'react';
+import { ComponentProps, ReactNode, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, fontSize, spacing } from '../theme';
+import { fontSize, spacing, useColors, type Colors } from '../theme';
 
 interface Props {
   icon: ComponentProps<typeof Ionicons>['name'];
@@ -12,6 +12,8 @@ interface Props {
 }
 
 export function EmptyState({ icon, title, message, children }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.container}>
       <Ionicons color={colors.textMuted} name={icon} size={48} />
@@ -22,7 +24,7 @@ export function EmptyState({ icon, title, message, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   container: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,

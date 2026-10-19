@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle } from 'react-native';
 
-import { colors, fontSize, spacing } from '../theme';
+import { fontSize, spacing, useColors, type Colors } from '../theme';
 
 interface Props {
   title: string;
@@ -8,10 +9,12 @@ interface Props {
 }
 
 export function SectionTitle({ title, style }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return <Text style={[styles.title, style]}>{title}</Text>;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: fontSize.xl,

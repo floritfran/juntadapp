@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -15,7 +15,7 @@ import { Screen } from '@/ui/components/Screen';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { formatMoney, groupDigits, parseAmountToInt } from '@/ui/format';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface ExpenseFormProps {
   getTogether: GetTogether;
@@ -36,6 +36,8 @@ export function ExpenseForm({
   initialPayerId = null,
   initialParticipantIds,
 }: ExpenseFormProps) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [description, setDescription] = useState(initialDescription);
   const [amountText, setAmountText] = useState(
@@ -169,6 +171,9 @@ export function ExpenseForm({
 }
 
 export function ExpenseFormLoading() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
   return (
     <Screen>
       <View style={styles.loading}>
@@ -178,7 +183,7 @@ export function ExpenseFormLoading() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   loading: {
     flex: 1,
     alignItems: 'center',
