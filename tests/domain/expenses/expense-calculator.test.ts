@@ -1,5 +1,10 @@
-import { Expense, PersonId } from '../../../src/domain/expenses/expense-types';
-import { calculateBalances, calculateShares, minimizeTransfers } from '../../../src/domain/expenses/expense-calculator';
+import { Expense, PersonId, Settlement } from '../../../src/domain/expenses/expense-types';
+import {
+  calculateBalances,
+  calculateDirectTransfers,
+  calculateShares,
+  minimizeTransfers,
+} from '../../../src/domain/expenses/expense-calculator';
 
 const p = (id: string): PersonId => id;
 const exp = (
@@ -15,6 +20,24 @@ const exp = (
   description: id,
   amountInt: amount,
   participantIds: participants,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  deletedAt: null,
+  ...overrides,
+});
+
+const stl = (
+  id: string,
+  from: PersonId,
+  to: PersonId,
+  amount: number,
+  overrides?: Partial<Settlement>
+): Settlement => ({
+  id,
+  getTogetherId: 'gt1',
+  fromId: from,
+  toId: to,
+  amountInt: amount,
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
@@ -81,5 +104,39 @@ describe('expenses - edicion', () => {
     bals.forEach((b) => (m[b.personId] = b.net));
     expect(m[p('b')]).toBe(15);
     expect(m[p('c')]).toBe(-15);
+  });
+});
+
+describe('expenses - saldar deudas', () => {
+  test('a settlement cancels the debt between two people', () => {
+    const e = exp('e1', p('a'), 30, [p('a'), p('b')]);
+    const before = calculateBalances([e]);
+    expect(before.find((b) => b.personId === p('b'))?.net).toBe(-15);
+
+    const after = calculateBalances([e], [stl('s1', p('b'), p('a'), 15)]);
+    expect(after.find((b) => b.personId === p('b'))?.net).toBe(0);
+    expect(after.find((b) => b.personId === p('a'))?.net).toBe(0);
+  });
+
+  test('partial settlement leaves the remaining debt', () => {
+    const e = exp('e1', p('a'), 30, [p('a'), p('b')]);
+    const bals = calculateBalances([e], [stl('s1', p('b'), p('a'), 5)]);
+    const m: Record<string, number> = {};
+    bals.forEach((b) => (m[b.personId] = b.net));
+    expect(m[p('a')]).toBe(10);
+    expect(m[p('b')]).toBe(-10);
+  });
+
+  test('transfers disappear once the debt is settled', () => {
+    const e = exp('e1', p('a'), 30, [p('a'), p('b')]);
+    expect(minimizeTransfers([e])).toEqual([{ from: p('b'), to: p('a'), amount: 15 }]);
+    expect(minimizeTransfers([e], [stl('s1', p('b'), p('a'), 15)])).toEqual([]);
+    expect(calculateDirectTransfers([e], [stl('s1', p('b'), p('a'), 15)])).toEqual([]);
+  });
+
+  test('deleted settlements are ignored', () => {
+    const e = exp('e1', p('a'), 30, [p('a'), p('b')]);
+    const bals = calculateBalances([e], [stl('s1', p('b'), p('a'), 15, { deletedAt: new Date() })]);
+    expect(bals.find((b) => b.personId === p('b'))?.net).toBe(-15);
   });
 });

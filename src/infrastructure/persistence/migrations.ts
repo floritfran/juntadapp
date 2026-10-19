@@ -150,6 +150,22 @@ CREATE TABLE generic_adjustments (
 CREATE INDEX idx_generic_adjustments_match ON generic_adjustments(match_id);
 `,
   },
+  {
+    version: 5,
+    sql: `
+CREATE TABLE settlements (
+  id TEXT PRIMARY KEY NOT NULL,
+  get_together_id TEXT NOT NULL REFERENCES get_togethers(id) ON DELETE CASCADE,
+  from_id TEXT NOT NULL REFERENCES people(id),
+  to_id TEXT NOT NULL REFERENCES people(id),
+  amount_int INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  deleted_at INTEGER
+);
+CREATE INDEX idx_settlements_get_together ON settlements(get_together_id);
+`,
+  },
 ];
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {

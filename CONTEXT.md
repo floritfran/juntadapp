@@ -20,6 +20,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 - Create a juntada: name, today's date, participants (manual selection or loaded from a saved group, then adjustable)
 - Record expenses: description, amount, payer, subset of participants
 - Edit an existing expense (description, amount, payer, participants); settlements recompute automatically
+- Settle a debt: register a payment (from → to, amount) that is subtracted from the pending settlements
 - Equal split with deterministic integer remainder
 - Settlement with two modes: direct payments and debt minimization (default)
 - Juntada detail: expenses list, totals, transfers, balances
@@ -100,6 +101,10 @@ v3 (truco hands store both teams at once):
 
 - truco_rounds rebuilt: id, match_id, round_number, team1_points, team2_points, created_at, UNIQUE(match_id, round_number) — legacy rows migrated from winner_team/points
 
+v5 (debt settlements):
+
+- settlements(id, get_together_id, from_id, to_id, amount_int, created_at, updated_at, deleted_at) — a registered payment counts as paid by `from_id` and owed by `to_id`, reducing pending transfers
+
 `position` preserves participant order (it decides who absorbs the split remainder).
 
 ## Main Business Rules
@@ -107,6 +112,7 @@ v3 (truco hands store both teams at once):
 - Money stored as integer ARS (no cents)
 - Equal split: remainder distributed to the first participants (index 0..r-1)
 - Soft delete for people, groups and expenses (preserve history)
+- Settlements (registered payments) count as paid for the payer and owed by the receiver, so they cancel pending transfers; soft deleted like expenses
 - Participants snapshot per juntada (history does not break if people change)
 - Editing or closing a juntada: NOT implemented yet (open product decision)
 
@@ -115,9 +121,9 @@ v3 (truco hands store both teams at once):
 All in `src/domain/expenses/expense-calculator.ts`:
 
 - `calculateShares(expense)`: per-participant amount via `splitEvenly`
-- `calculateBalances(expenses)`: net = paid - owes (deleted expenses ignored)
-- `calculateDirectTransfers(expenses)`: debtor -> creditor directly against original payers
-- `minimizeTransfers(expenses)`: default mode
+- `calculateBalances(expenses, settlements)`: net = paid - owes (deleted expenses/settlements ignored; a settlement adds to the payer's paid and the receiver's owed)
+- `calculateDirectTransfers(expenses, settlements)`: debtor -> creditor directly against original payers
+- `minimizeTransfers(expenses, settlements)`: default mode
 
 ## Debt Minimization Algorithm
 
@@ -146,6 +152,7 @@ Stack (root)
 ├── juntada/nueva        - create juntada (modal)
 ├── juntada/gasto-nuevo  - add expense (modal, ?id= getTogether)
 ├── juntada/gasto-editar - edit expense (modal, ?id= getTogether, ?expenseId=)
+├── juntada/pago-nuevo   - register a debt payment (modal, ?id= getTogether, optional ?fromId= ?toId= ?amount=)
 ├── juntada/juego-nuevo  - start match (modal, ?id= getTogether, ?game= preselect)
 ├── juntada/partida      - match scorer/history (?match= matchId)
 └── juntada/[id]         - detail with segmented Gastos | Juegos

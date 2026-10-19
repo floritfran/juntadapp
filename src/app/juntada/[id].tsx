@@ -9,12 +9,13 @@ import {
   calculateDirectTransfers,
   minimizeTransfers,
 } from '@/domain/expenses/expense-calculator';
-import { Expense } from '@/domain/expenses/expense-types';
+import { Expense, Settlement, Transfer } from '@/domain/expenses/expense-types';
 import { GetTogether } from '@/domain/get-togethers/get-together-types';
 import { Person, PersonId } from '@/domain/people/person-types';
 import { listExpenses, softDeleteExpense } from '@/infrastructure/persistence/expenses-repository';
 import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { listAllPeople } from '@/infrastructure/persistence/people-repository';
+import { listSettlements, softDeleteSettlement } from '@/infrastructure/persistence/settlements-repository';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
@@ -33,6 +34,7 @@ export default function JuntadaDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [getTogether, setGetTogether] = useState<GetTogether | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [notFound, setNotFound] = useState(false);
   const [mode, setMode] = useState<SettlementMode>('min');
@@ -44,13 +46,15 @@ export default function JuntadaDetailScreen() {
       return;
     }
     try {
-      const [getTogetherResult, expenseRows, allPeople] = await Promise.all([
+      const [getTogetherResult, expenseRows, settlementRows, allPeople] = await Promise.all([
         getGetTogether(db, id),
         listExpenses(db, id),
+        listSettlements(db, id),
         listAllPeople(db),
       ]);
       setGetTogether(getTogetherResult);
       setExpenses(expenseRows);
+      setSettlements(settlementRows);
       setPeople(allPeople);
       if (!getTogetherResult) setNotFound(true);
     } catch {
@@ -73,10 +77,13 @@ export default function JuntadaDetailScreen() {
   const nameOf = (personId: PersonId) => nameById.get(personId) ?? 'Persona eliminada';
 
   const total = useMemo(() => expenses.reduce((sum, expense) => sum + expense.amountInt, 0), [expenses]);
-  const balances = useMemo(() => calculateBalances(expenses), [expenses]);
+  const balances = useMemo(() => calculateBalances(expenses, settlements), [expenses, settlements]);
   const transfers = useMemo(
-    () => (mode === 'min' ? minimizeTransfers(expenses) : calculateDirectTransfers(expenses)),
-    [mode, expenses]
+    () =>
+      mode === 'min'
+        ? minimizeTransfers(expenses, settlements)
+        : calculateDirectTransfers(expenses, settlements),
+    [mode, expenses, settlements]
   );
   const hasDebts = balances.some((balance) => balance.net !== 0);
 
@@ -92,6 +99,34 @@ export default function JuntadaDetailScreen() {
         },
       },
     ]);
+
+  const confirmDeleteSettlement = (settlement: Settlement) =>
+    Alert.alert(
+      'Eliminar pago',
+      `¿Eliminar el pago de ${nameOf(settlement.fromId)} a ${nameOf(settlement.toId)}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            await softDeleteSettlement(db, settlement.id);
+            await load();
+          },
+        },
+      ]
+    );
+
+  const settleTransfer = (transfer: Transfer) =>
+    router.push({
+      pathname: '/juntada/pago-nuevo',
+      params: {
+        id: id ?? '',
+        fromId: transfer.from,
+        toId: transfer.to,
+        amount: String(transfer.amount),
+      },
+    });
 
   if (notFound) {
     return (
@@ -226,6 +261,34 @@ export default function JuntadaDetailScreen() {
               ))
             )}
 
+            {settlements.length > 0 ? (
+              <>
+                <SectionTitle style={styles.section} title="Pagos" />
+                {settlements.map((settlement) => (
+                  <Card key={settlement.id} style={styles.expenseCard}>
+                    <View style={styles.expenseRow}>
+                      <View style={styles.flex}>
+                        <Text numberOfLines={1} style={styles.expenseDescription}>
+                          {nameOf(settlement.fromId)} → {nameOf(settlement.toId)}
+                        </Text>
+                        <Text style={styles.expenseMeta}>Pago registrado</Text>
+                      </View>
+                      <Text style={[styles.expenseAmount, styles.settlementAmount]}>
+                        {formatMoney(settlement.amountInt)}
+                      </Text>
+                      <Pressable
+                        hitSlop={8}
+                        onPress={() => confirmDeleteSettlement(settlement)}
+                        style={styles.iconButton}
+                      >
+                        <Ionicons color={colors.danger} name="trash-outline" size={20} />
+                      </Pressable>
+                    </View>
+                  </Card>
+                ))}
+              </>
+            ) : null}
+
             <SectionTitle style={styles.section} title="Liquidación" />
             {expenses.length === 0 || !hasDebts ? (
               <EmptyState
@@ -255,6 +318,13 @@ export default function JuntadaDetailScreen() {
                         {nameOf(transfer.from)} → {nameOf(transfer.to)}
                       </Text>
                       <Text style={styles.transferAmount}>{formatMoney(transfer.amount)}</Text>
+                      <Pressable
+                        hitSlop={8}
+                        onPress={() => settleTransfer(transfer)}
+                        style={styles.settleButton}
+                      >
+                        <Text style={styles.settleButtonText}>Saldar</Text>
+                      </Pressable>
                     </View>
                   ))}
                   <Text style={styles.transferTotal}>
@@ -393,6 +463,21 @@ const styles = StyleSheet.create({
     fontSize: fontSize.lg,
     fontWeight: '700',
     marginLeft: spacing.sm,
+  },
+  settlementAmount: {
+    color: colors.success,
+  },
+  settleButton: {
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.pill,
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  settleButtonText: {
+    color: colors.primary,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
   },
   iconButton: {
     alignItems: 'center',

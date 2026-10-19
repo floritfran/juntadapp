@@ -1,5 +1,5 @@
 import { MoneyInt, splitEvenly } from '../common/Money';
-import { Balance, Expense, PersonId, Transfer } from './expense-types';
+import { Balance, Expense, PersonId, Settlement, Transfer } from './expense-types';
 
 export function calculateShares(expense: Expense): Record<PersonId, MoneyInt> {
   const participants = expense.participantIds;
@@ -12,7 +12,10 @@ export function calculateShares(expense: Expense): Record<PersonId, MoneyInt> {
   return out;
 }
 
-export function calculateBalances(expenses: Expense[]): Balance[] {
+export function calculateBalances(
+  expenses: Expense[],
+  settlements: Settlement[] = []
+): Balance[] {
   const paid: Map<PersonId, MoneyInt> = new Map();
   const owed: Map<PersonId, MoneyInt> = new Map();
 
@@ -26,6 +29,13 @@ export function calculateBalances(expenses: Expense[]): Balance[] {
       });
     });
 
+  settlements
+    .filter((s) => !s.deletedAt)
+    .forEach((s) => {
+      paid.set(s.fromId, (paid.get(s.fromId) ?? 0) + s.amountInt);
+      owed.set(s.toId, (owed.get(s.toId) ?? 0) + s.amountInt);
+    });
+
   const all = new Set([...paid.keys(), ...owed.keys()]);
   const balances: Balance[] = [];
   for (const pid of all) {
@@ -36,8 +46,11 @@ export function calculateBalances(expenses: Expense[]): Balance[] {
   return balances;
 }
 
-export function calculateDirectTransfers(expenses: Expense[]): Transfer[] {
-  const balances = calculateBalances(expenses).filter((b) => b.net !== 0);
+export function calculateDirectTransfers(
+  expenses: Expense[],
+  settlements: Settlement[] = []
+): Transfer[] {
+  const balances = calculateBalances(expenses, settlements).filter((b) => b.net !== 0);
   const transfers: Transfer[] = [];
   for (let i = 0; i < balances.length; i++) {
     for (let j = i + 1; j < balances.length; j++) {
@@ -60,8 +73,11 @@ export function calculateDirectTransfers(expenses: Expense[]): Transfer[] {
   return transfers;
 }
 
-export function minimizeTransfers(expenses: Expense[]): Transfer[] {
-  const balances = calculateBalances(expenses)
+export function minimizeTransfers(
+  expenses: Expense[],
+  settlements: Settlement[] = []
+): Transfer[] {
+  const balances = calculateBalances(expenses, settlements)
     .map((b) => ({ personId: b.personId, net: b.net }))
     .filter((b) => b.net !== 0);
 

@@ -7,6 +7,8 @@ export type { PersonId } from '../people/person-types';
 
 export type ExpenseId = string;
 
+export type SettlementId = string;
+
 export interface Expense {
   id: ExpenseId;
   getTogetherId: GetTogetherId;
@@ -22,6 +24,17 @@ export interface Expense {
 export interface Balance {
   personId: PersonId;
   net: MoneyInt; // paid - owes
+}
+
+export interface Settlement {
+  id: SettlementId;
+  getTogetherId: GetTogetherId;
+  fromId: PersonId;
+  toId: PersonId;
+  amountInt: MoneyInt;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
 }
 
 export interface Transfer {
