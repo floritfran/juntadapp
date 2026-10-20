@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 're
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
+import { matchesQuery } from '@/domain/common/text-search';
 import { GAME_LABELS, GameId, TrucoTeam, TrucoTeamSize } from '@/domain/games/game-types';
 import { validateTrucoTeamSetup } from '@/domain/games/truco/truco-scorer';
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
@@ -15,6 +16,7 @@ import { CheckRow } from '@/ui/components/CheckRow';
 import { Chip } from '@/ui/components/Chip';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
+import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
@@ -45,6 +47,12 @@ export default function NuevaPartidaScreen() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [teamByPerson, setTeamByPerson] = useState<Record<string, TrucoTeam>>({});
   const [saving, setSaving] = useState(false);
+  const [personQuery, setPersonQuery] = useState('');
+
+  const filteredPeople = useMemo(
+    () => people.filter((person) => matchesQuery(person.name, personQuery)),
+    [people, personQuery]
+  );
 
   const load = useCallback(async () => {
     const [peopleResult, groupsResult, getTogether] = await Promise.all([
@@ -229,14 +237,23 @@ export default function NuevaPartidaScreen() {
           </EmptyState>
         ) : (
           <>
-            {people.map((person) => (
-              <CheckRow
-                checked={selectedIds.includes(person.id)}
-                key={person.id}
-                label={person.name}
-                onToggle={() => togglePerson(person.id)}
+            <SearchField onChangeText={setPersonQuery} value={personQuery} />
+            {filteredPeople.length === 0 ? (
+              <EmptyState
+                icon="search-outline"
+                message="Probá con otro nombre."
+                title="No se encontraron personas"
               />
-            ))}
+            ) : (
+              filteredPeople.map((person) => (
+                <CheckRow
+                  checked={selectedIds.includes(person.id)}
+                  key={person.id}
+                  label={person.name}
+                  onToggle={() => togglePerson(person.id)}
+                />
+              ))
+            )}
             <Text style={styles.counter}>
               {selectedIds.length === 1
                 ? '1 jugador seleccionado'

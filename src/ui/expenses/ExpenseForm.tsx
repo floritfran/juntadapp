@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 're
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
+import { matchesQuery } from '@/domain/common/text-search';
 import { ExpenseId } from '@/domain/expenses/expense-types';
 import { GetTogether } from '@/domain/get-togethers/get-together-types';
 import { Person, PersonId } from '@/domain/people/person-types';
@@ -12,6 +13,7 @@ import { CheckRow } from '@/ui/components/CheckRow';
 import { Chip } from '@/ui/components/Chip';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
+import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { formatMoney, groupDigits, parseAmountToInt } from '@/ui/format';
@@ -50,6 +52,7 @@ export function ExpenseForm({
     initialParticipantIds ?? getTogether.participantIds
   );
   const [saving, setSaving] = useState(false);
+  const [personQuery, setPersonQuery] = useState('');
 
   const amountInt = parseAmountToInt(amountText);
 
@@ -101,6 +104,11 @@ export function ExpenseForm({
     .map((personId) => people.find((person) => person.id === personId))
     .filter((person): person is Person => person != null);
 
+  const filteredParticipants = useMemo(
+    () => participants.filter((person) => matchesQuery(person.name, personQuery)),
+    [participants, personQuery]
+  );
+
   if (participants.length === 0) {
     return (
       <Screen>
@@ -134,30 +142,37 @@ export function ExpenseForm({
         />
         {amountInt > 0 ? <Text style={styles.amountPreview}>{formatMoney(amountInt)}</Text> : null}
 
-        <SectionTitle style={styles.section} title="¿Quién pagó?" />
-        <View style={styles.chipsRow}>
-          {participants.map((person) => (
-            <Chip
-              key={person.id}
-              label={person.name}
-              onPress={() => setPayerId(person.id)}
-              selected={payerId === person.id}
-            />
-          ))}
-        </View>
+        <SearchField onChangeText={setPersonQuery} value={personQuery} />
+        {filteredParticipants.length === 0 ? (
+          <Text style={styles.hint}>No se encontraron personas.</Text>
+        ) : (
+          <>
+            <SectionTitle style={styles.section} title="¿Quién pagó?" />
+            <View style={styles.chipsRow}>
+              {filteredParticipants.map((person) => (
+                <Chip
+                  key={person.id}
+                  label={person.name}
+                  onPress={() => setPayerId(person.id)}
+                  selected={payerId === person.id}
+                />
+              ))}
+            </View>
 
-        <SectionTitle style={styles.section} title="¿Quiénes participan?" />
-        {participants.map((person) => (
-          <CheckRow
-            checked={participantIds.includes(person.id)}
-            key={person.id}
-            label={person.name}
-            onToggle={() => toggleParticipant(person.id)}
-          />
-        ))}
-        <Text style={styles.hint}>
-          La división se reparte en partes iguales entre los participantes.
-        </Text>
+            <SectionTitle style={styles.section} title="¿Quiénes participan?" />
+            {filteredParticipants.map((person) => (
+              <CheckRow
+                checked={participantIds.includes(person.id)}
+                key={person.id}
+                label={person.name}
+                onToggle={() => toggleParticipant(person.id)}
+              />
+            ))}
+            <Text style={styles.hint}>
+              La división se reparte en partes iguales entre los participantes.
+            </Text>
+          </>
+        )}
       </ScrollView>
       <View style={styles.footer}>
         <Button

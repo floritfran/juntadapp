@@ -4,6 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import dayjs from 'dayjs';
 
+import { matchesQuery } from '@/domain/common/text-search';
 import { Person } from '@/domain/people/person-types';
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
 import { createGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
@@ -13,6 +14,7 @@ import { CheckRow } from '@/ui/components/CheckRow';
 import { Chip } from '@/ui/components/Chip';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
+import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { formatDate } from '@/ui/format';
@@ -31,6 +33,12 @@ export default function NuevaJuntadaScreen() {
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [personQuery, setPersonQuery] = useState('');
+
+  const filteredPeople = useMemo(
+    () => people.filter((person) => matchesQuery(person.name, personQuery)),
+    [people, personQuery]
+  );
 
   const load = useCallback(async () => {
     const [peopleResult, groupsResult] = await Promise.all([listPeople(db), listGroups(db)]);
@@ -158,14 +166,23 @@ export default function NuevaJuntadaScreen() {
           </EmptyState>
         ) : (
           <>
-            {people.map((person) => (
-              <CheckRow
-                checked={selectedIds.includes(person.id)}
-                key={person.id}
-                label={person.name}
-                onToggle={() => togglePerson(person.id)}
+            <SearchField onChangeText={setPersonQuery} value={personQuery} />
+            {filteredPeople.length === 0 ? (
+              <EmptyState
+                icon="search-outline"
+                message="Probá con otro nombre."
+                title="No se encontraron personas"
               />
-            ))}
+            ) : (
+              filteredPeople.map((person) => (
+                <CheckRow
+                  checked={selectedIds.includes(person.id)}
+                  key={person.id}
+                  label={person.name}
+                  onToggle={() => togglePerson(person.id)}
+                />
+              ))
+            )}
             {showNewPerson ? (
               <View style={styles.newPerson}>
                 <TextField
