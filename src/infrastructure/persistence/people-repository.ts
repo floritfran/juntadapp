@@ -49,6 +49,10 @@ export async function createPerson(db: SQLiteDatabase, name: string): Promise<Pe
   return person;
 }
 
+export async function updatePerson(db: SQLiteDatabase, id: PersonId, name: string): Promise<void> {
+  await db.runAsync('UPDATE people SET name = ? WHERE id = ?', name.trim(), id);
+}
+
 export async function softDeletePerson(db: SQLiteDatabase, id: PersonId): Promise<void> {
   await db.runAsync('UPDATE people SET deleted_at = ? WHERE id = ?', Date.now(), id);
 }

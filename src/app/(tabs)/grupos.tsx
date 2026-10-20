@@ -4,14 +4,21 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
-import { Person } from '@/domain/people/person-types';
+import { GroupId } from '@/domain/groups/group-types';
+import { Person, PersonId } from '@/domain/people/person-types';
 import {
   GroupWithMembers,
   createGroup,
   listGroups,
   softDeleteGroup,
+  updateGroup,
 } from '@/infrastructure/persistence/groups-repository';
-import { createPerson, listPeople, softDeletePerson } from '@/infrastructure/persistence/people-repository';
+import {
+  createPerson,
+  listPeople,
+  softDeletePerson,
+  updatePerson,
+} from '@/infrastructure/persistence/people-repository';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { CheckRow } from '@/ui/components/CheckRow';
@@ -32,6 +39,12 @@ export default function GruposScreen() {
   const [groupName, setGroupName] = useState('');
   const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
   const [savingGroup, setSavingGroup] = useState(false);
+  const [editingPersonId, setEditingPersonId] = useState<PersonId | null>(null);
+  const [editingPersonName, setEditingPersonName] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<GroupId | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState('');
+  const [editingGroupMemberIds, setEditingGroupMemberIds] = useState<PersonId[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = useCallback(async () => {
     const [peopleResult, groupsResult] = await Promise.all([listPeople(db), listGroups(db)]);
@@ -58,6 +71,30 @@ export default function GruposScreen() {
     }
   };
 
+  const cancelEditPerson = () => {
+    setEditingPersonId(null);
+    setEditingPersonName('');
+  };
+
+  const cancelEditGroup = () => {
+    setEditingGroupId(null);
+    setEditingGroupName('');
+    setEditingGroupMemberIds([]);
+  };
+
+  const startEditPerson = (person: Person) => {
+    cancelEditGroup();
+    setEditingPersonId(person.id);
+    setEditingPersonName(person.name);
+  };
+
+  const startEditGroup = (group: GroupWithMembers) => {
+    cancelEditPerson();
+    setEditingGroupId(group.id);
+    setEditingGroupName(group.name);
+    setEditingGroupMemberIds([...group.memberIds]);
+  };
+
   const confirmDeletePerson = (person: Person) =>
     Alert.alert('Eliminar persona', `¿Eliminar a ${person.name}?`, [
       { text: 'Cancelar', style: 'cancel' },
@@ -65,6 +102,7 @@ export default function GruposScreen() {
         text: 'Eliminar',
         style: 'destructive',
         onPress: async () => {
+          if (editingPersonId === person.id) cancelEditPerson();
           await softDeletePerson(db, person.id);
           await load();
         },
@@ -78,11 +116,51 @@ export default function GruposScreen() {
         text: 'Eliminar',
         style: 'destructive',
         onPress: async () => {
+          if (editingGroupId === group.id) cancelEditGroup();
           await softDeleteGroup(db, group.id);
           await load();
         },
       },
     ]);
+
+  const submitEditPerson = async () => {
+    const name = editingPersonName.trim();
+    if (!name || !editingPersonId) return;
+    setSavingEdit(true);
+    try {
+      await updatePerson(db, editingPersonId, name);
+      cancelEditPerson();
+      await load();
+    } catch {
+      Alert.alert('Error', 'No se pudo editar la persona.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const toggleEditingGroupMember = (personId: PersonId) =>
+    setEditingGroupMemberIds((ids) =>
+      ids.includes(personId) ? ids.filter((id) => id !== personId) : [...ids, personId]
+    );
+
+  const submitEditGroup = async () => {
+    const name = editingGroupName.trim();
+    if (!name || !editingGroupId) return;
+    if (editingGroupMemberIds.length === 0) {
+      Alert.alert('Sin integrantes', 'Elegí al menos un integrante.');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await updateGroup(db, editingGroupId, { name, memberIds: editingGroupMemberIds });
+      cancelEditGroup();
+      await load();
+    } catch {
+      Alert.alert('Error', 'No se pudo editar el grupo.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   const toggleMember = (personId: string) =>
     setGroupMemberIds((ids) =>
@@ -128,20 +206,39 @@ export default function GruposScreen() {
         <SectionTitle title="Personas" />
         <TextField
           autoCapitalize="words"
-          label="Nueva persona"
-          onChangeText={setNewPersonName}
-          onSubmitEditing={addPerson}
+          label={editingPersonId ? 'Nombre' : 'Nueva persona'}
+          onChangeText={editingPersonId ? setEditingPersonName : setNewPersonName}
+          onSubmitEditing={editingPersonId ? submitEditPerson : addPerson}
           placeholder="Nombre"
           returnKeyType="done"
-          value={newPersonName}
+          value={editingPersonId ? editingPersonName : newPersonName}
         />
-        <Button
-          disabled={!newPersonName.trim()}
-          onPress={addPerson}
-          style={styles.blockButton}
-          title="Agregar persona"
-          variant="secondary"
-        />
+        {editingPersonId ? (
+          <>
+            <Button
+              disabled={!editingPersonName.trim()}
+              loading={savingEdit}
+              onPress={submitEditPerson}
+              style={styles.blockButton}
+              title="Guardar cambios"
+            />
+            <Button
+              disabled={savingEdit}
+              onPress={cancelEditPerson}
+              style={styles.blockButton}
+              title="Cancelar"
+              variant="secondary"
+            />
+          </>
+        ) : (
+          <Button
+            disabled={!newPersonName.trim()}
+            onPress={addPerson}
+            style={styles.blockButton}
+            title="Agregar persona"
+            variant="secondary"
+          />
+        )}
         {people.length === 0 ? (
           <EmptyState
             icon="person-outline"
@@ -154,13 +251,22 @@ export default function GruposScreen() {
               <Text numberOfLines={1} style={styles.personName}>
                 {person.name}
               </Text>
-              <Pressable
-                hitSlop={8}
-                onPress={() => confirmDeletePerson(person)}
-                style={styles.iconButton}
-              >
-                <Ionicons color={colors.danger} name="trash-outline" size={20} />
-              </Pressable>
+              <View style={styles.rowIcons}>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => startEditPerson(person)}
+                  style={styles.iconButton}
+                >
+                  <Ionicons color={colors.primary} name="create-outline" size={20} />
+                </Pressable>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => confirmDeletePerson(person)}
+                  style={styles.iconButton}
+                >
+                  <Ionicons color={colors.danger} name="trash-outline" size={20} />
+                </Pressable>
+              </View>
             </View>
           ))
         )}
@@ -179,13 +285,22 @@ export default function GruposScreen() {
                 <Text numberOfLines={1} style={styles.groupName}>
                   {group.name}
                 </Text>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() => confirmDeleteGroup(group)}
-                  style={styles.iconButton}
-                >
-                  <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                </Pressable>
+                <View style={styles.rowIcons}>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => startEditGroup(group)}
+                    style={styles.iconButton}
+                  >
+                    <Ionicons color={colors.primary} name="create-outline" size={20} />
+                  </Pressable>
+                  <Pressable
+                    hitSlop={8}
+                    onPress={() => confirmDeleteGroup(group)}
+                    style={styles.iconButton}
+                  >
+                    <Ionicons color={colors.danger} name="trash-outline" size={20} />
+                  </Pressable>
+                </View>
               </View>
               <Text style={styles.groupMembers}>
                 {group.members.length > 0
@@ -196,13 +311,13 @@ export default function GruposScreen() {
           ))
         )}
 
-        <SectionTitle style={styles.section} title="Nuevo grupo" />
+        <SectionTitle style={styles.section} title={editingGroupId ? 'Editar grupo' : 'Nuevo grupo'} />
         <TextField
           autoCapitalize="words"
           label="Nombre del grupo"
-          onChangeText={setGroupName}
+          onChangeText={editingGroupId ? setEditingGroupName : setGroupName}
           placeholder="Ej: Los pibes"
-          value={groupName}
+          value={editingGroupId ? editingGroupName : groupName}
         />
         <Text style={styles.fieldLabel}>Integrantes</Text>
         {people.length === 0 ? (
@@ -210,20 +325,45 @@ export default function GruposScreen() {
         ) : (
           people.map((person) => (
             <CheckRow
-              checked={groupMemberIds.includes(person.id)}
+              checked={
+                editingGroupId
+                  ? editingGroupMemberIds.includes(person.id)
+                  : groupMemberIds.includes(person.id)
+              }
               key={person.id}
               label={person.name}
-              onToggle={() => toggleMember(person.id)}
+              onToggle={() =>
+                editingGroupId ? toggleEditingGroupMember(person.id) : toggleMember(person.id)
+              }
             />
           ))
         )}
-        <Button
-          disabled={!groupName.trim() || groupMemberIds.length === 0}
-          loading={savingGroup}
-          onPress={submitGroup}
-          style={styles.blockButton}
-          title="Crear grupo"
-        />
+        {editingGroupId ? (
+          <>
+            <Button
+              disabled={!editingGroupName.trim() || editingGroupMemberIds.length === 0}
+              loading={savingEdit}
+              onPress={submitEditGroup}
+              style={styles.blockButton}
+              title="Guardar cambios"
+            />
+            <Button
+              disabled={savingEdit}
+              onPress={cancelEditGroup}
+              style={styles.blockButton}
+              title="Cancelar"
+              variant="secondary"
+            />
+          </>
+        ) : (
+          <Button
+            disabled={!groupName.trim() || groupMemberIds.length === 0}
+            loading={savingGroup}
+            onPress={submitGroup}
+            style={styles.blockButton}
+            title="Crear grupo"
+          />
+        )}
       </ScrollView>
     </Screen>
   );
@@ -268,6 +408,10 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
     justifyContent: 'center',
     minHeight: 44,
     minWidth: 44,
+  },
+  rowIcons: {
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   groupCard: {
     marginBottom: spacing.md,

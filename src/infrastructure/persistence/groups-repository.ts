@@ -88,6 +88,34 @@ export async function createGroup(
   return group;
 }
 
+export async function updateGroup(
+  db: SQLiteDatabase,
+  id: GroupId,
+  input: { name: string; memberIds: PersonId[] }
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('UPDATE groups SET name = ? WHERE id = ?', input.name.trim(), id);
+    const retainedRows = await db.getAllAsync<{ person_id: PersonId }>(
+      `SELECT gm.person_id
+         FROM group_members gm
+         LEFT JOIN people p ON p.id = gm.person_id
+        WHERE gm.group_id = ?
+          AND (p.id IS NULL OR p.deleted_at IS NOT NULL)`,
+      id
+    );
+    await db.runAsync('DELETE FROM group_members WHERE group_id = ?', id);
+    const memberIds = [...input.memberIds, ...retainedRows.map((row) => row.person_id)];
+    for (let position = 0; position < memberIds.length; position++) {
+      await db.runAsync(
+        'INSERT INTO group_members (group_id, person_id, position) VALUES (?, ?, ?)',
+        id,
+        memberIds[position],
+        position
+      );
+    }
+  });
+}
+
 export async function softDeleteGroup(db: SQLiteDatabase, id: GroupId): Promise<void> {
   await db.runAsync('UPDATE groups SET deleted_at = ? WHERE id = ?', Date.now(), id);
 }
