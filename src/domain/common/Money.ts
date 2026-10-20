@@ -14,3 +14,9 @@ export function splitEvenly(amount: MoneyInt, count: number): MoneyInt[] {
 export function sum(values: MoneyInt[]): MoneyInt {
   return values.reduce((acc, v) => acc + v, 0);
 }
+
+export function formatMoneyInt(amount: MoneyInt): string {
+  const sign = amount < 0 ? '-' : '';
+  const grouped = String(Math.abs(Math.trunc(amount))).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return `${sign}$ ${grouped}`;
+}

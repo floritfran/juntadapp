@@ -23,6 +23,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 - Settle a debt: register a payment (from → to, amount) that is subtracted from the pending settlements
 - Equal split with deterministic integer remainder
 - Settlement with two modes: direct payments and debt minimization (default)
+- Share settlement summary: plain text with total spent + pending transfers (`from le pasa $X a to`), built by a pure domain function and shared via the native share sheet
 - Juntada detail: expenses list, totals, transfers, balances
 - Juntadas list with date, participant count and total spent
 - SQLite persistence with migrations
@@ -137,6 +138,7 @@ All in `src/domain/expenses/expense-calculator.ts`:
 - `calculateBalances(expenses, settlements)`: net = paid - owes (deleted expenses/settlements ignored; a settlement adds to the payer's paid and the receiver's owed)
 - `calculateDirectTransfers(expenses, settlements)`: debtor -> creditor directly against original payers
 - `minimizeTransfers(expenses, settlements)`: default mode
+- `buildSettlementSummaryText(summary)` in `settlement-summary.ts`: plain-text share summary (title + total + one line per transfer, or "todo saldado" when there are none); money is formatted by `formatMoneyInt` in `domain/common/Money.ts`, the single source of truth behind `ui/format.ts` `formatMoney`
 
 ## Debt Minimization Algorithm
 

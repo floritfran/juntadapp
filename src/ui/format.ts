@@ -1,5 +1,7 @@
 import dayjs from 'dayjs';
 
+import { formatMoneyInt } from '@/domain/common/Money';
+
 export function groupDigits(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 }
@@ -10,8 +12,7 @@ export function parseAmountToInt(text: string): number {
 }
 
 export function formatMoney(amount: number): string {
-  const sign = amount < 0 ? '-' : '';
-  return `${sign}$ ${groupDigits(String(Math.abs(Math.trunc(amount))))}`;
+  return formatMoneyInt(amount);
 }
 
 export function formatDate(date: Date): string {
