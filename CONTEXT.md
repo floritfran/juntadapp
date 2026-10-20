@@ -17,6 +17,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 
 - People management (create, list, edit name, soft delete)
 - Friend groups (create with members, list, edit name/members, soft delete)
+- Search field to filter people by name (case- and accent-insensitive) in the Grupos tab, participant/player selection and expense/settlement forms
 - Create a juntada: name, today's date, participants (manual selection or loaded from a saved group, then adjustable)
 - Record expenses: description, amount, payer, subset of participants
 - Edit an existing expense (description, amount, payer, participants); settlements recompute automatically
@@ -73,6 +74,7 @@ src/infrastructure
   /id.ts         - UUID generator
 src/ui           - theme.ts, format.ts, shared components (Button, TextField, Card...)
   /games         - scorer components (GamesSection, TrucoScorer, GeneralaScorer, SkullKingScorer)
+src/domain/common - shared pure helpers (Money, text-search: normalizeForSearch/matchesQuery)
 tests/domain     - unit tests for domain logic (expenses, games)
 docs/adr         - architectural decision records (none yet)
 ```
@@ -263,6 +265,8 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the
 - Games module: Truco, Generala, Skull King and a new generic scorekeeper (domain + tests, migration v4, repository, setup screen, scorer, match list in the Juegos tab)
 - Light/dark theme follows the device color scheme (theme context + `userInterfaceStyle: automatic`)
 - People and groups can be edited inline from the Grupos tab (`updatePerson` / `updateGroup` repositories)
-- Verified: `npm run lint`, `npm run typecheck` (jest is temporarily broken by a pre-existing `expo-modules-core`/`expo-router` type conflict in the test transform)
+- Settlement summary shareable as plain text from the Liquidación section (domain `buildSettlementSummaryText` + native share sheet)
+- People search: `SearchField` component + `matchesQuery` (domain/common) filter people lists in memory without altering the selection
+- Verified: `npm test`, `npm run lint`, `npm run typecheck`
 
 Next steps: edit/close juntadas + date picker, then game statistics.

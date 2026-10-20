@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
+import { matchesQuery } from '@/domain/common/text-search';
 import { GroupId } from '@/domain/groups/group-types';
 import { Person, PersonId } from '@/domain/people/person-types';
 import {
@@ -24,6 +25,7 @@ import { Card } from '@/ui/components/Card';
 import { CheckRow } from '@/ui/components/CheckRow';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
+import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { fontSize, radius, spacing, useColors, type Colors } from '@/ui/theme';
@@ -45,6 +47,12 @@ export default function GruposScreen() {
   const [editingGroupName, setEditingGroupName] = useState('');
   const [editingGroupMemberIds, setEditingGroupMemberIds] = useState<PersonId[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [personQuery, setPersonQuery] = useState('');
+
+  const filteredPeople = useMemo(
+    () => people.filter((person) => matchesQuery(person.name, personQuery)),
+    [people, personQuery]
+  );
 
   const load = useCallback(async () => {
     const [peopleResult, groupsResult] = await Promise.all([listPeople(db), listGroups(db)]);
@@ -246,29 +254,40 @@ export default function GruposScreen() {
             title="Sin personas"
           />
         ) : (
-          people.map((person) => (
-            <View key={person.id} style={styles.personRow}>
-              <Text numberOfLines={1} style={styles.personName}>
-                {person.name}
-              </Text>
-              <View style={styles.rowIcons}>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() => startEditPerson(person)}
-                  style={styles.iconButton}
-                >
-                  <Ionicons color={colors.primary} name="create-outline" size={20} />
-                </Pressable>
-                <Pressable
-                  hitSlop={8}
-                  onPress={() => confirmDeletePerson(person)}
-                  style={styles.iconButton}
-                >
-                  <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                </Pressable>
-              </View>
-            </View>
-          ))
+          <>
+            <SearchField onChangeText={setPersonQuery} value={personQuery} />
+            {filteredPeople.length === 0 ? (
+              <EmptyState
+                icon="search-outline"
+                message="Probá con otro nombre."
+                title="No se encontraron personas"
+              />
+            ) : (
+              filteredPeople.map((person) => (
+                <View key={person.id} style={styles.personRow}>
+                  <Text numberOfLines={1} style={styles.personName}>
+                    {person.name}
+                  </Text>
+                  <View style={styles.rowIcons}>
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => startEditPerson(person)}
+                      style={styles.iconButton}
+                    >
+                      <Ionicons color={colors.primary} name="create-outline" size={20} />
+                    </Pressable>
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => confirmDeletePerson(person)}
+                      style={styles.iconButton}
+                    >
+                      <Ionicons color={colors.danger} name="trash-outline" size={20} />
+                    </Pressable>
+                  </View>
+                </View>
+              ))
+            )}
+          </>
         )}
 
         <SectionTitle style={styles.section} title="Grupos" />
@@ -322,8 +341,10 @@ export default function GruposScreen() {
         <Text style={styles.fieldLabel}>Integrantes</Text>
         {people.length === 0 ? (
           <Text style={styles.hint}>Primero agregá personas arriba.</Text>
+        ) : filteredPeople.length === 0 ? (
+          <Text style={styles.hint}>No se encontraron personas.</Text>
         ) : (
-          people.map((person) => (
+          filteredPeople.map((person) => (
             <CheckRow
               checked={
                 editingGroupId

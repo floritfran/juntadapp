@@ -3,12 +3,14 @@ import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 're
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
+import { matchesQuery } from '@/domain/common/text-search';
 import { Person, PersonId } from '@/domain/people/person-types';
 import { createSettlement } from '@/infrastructure/persistence/settlements-repository';
 import { Button } from '@/ui/components/Button';
 import { Chip } from '@/ui/components/Chip';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
+import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { formatMoney, groupDigits, parseAmountToInt } from '@/ui/format';
@@ -42,6 +44,7 @@ export function SettlementForm({
     initialAmountInt > 0 ? groupDigits(String(initialAmountInt)) : ''
   );
   const [saving, setSaving] = useState(false);
+  const [personQuery, setPersonQuery] = useState('');
 
   const amountInt = parseAmountToInt(amountText);
   const onAmountChange = (text: string) => setAmountText(groupDigits(text.replace(/\D/g, '')));
@@ -49,6 +52,11 @@ export function SettlementForm({
   const participants = participantIds
     .map((personId) => people.find((person) => person.id === personId))
     .filter((person): person is Person => person != null);
+
+  const filteredParticipants = useMemo(
+    () => participants.filter((person) => matchesQuery(person.name, personQuery)),
+    [participants, personQuery]
+  );
 
   const submit = async () => {
     if (!fromId) {
@@ -103,30 +111,37 @@ export function SettlementForm({
         />
         {amountInt > 0 ? <Text style={styles.amountPreview}>{formatMoney(amountInt)}</Text> : null}
 
-        <SectionTitle style={styles.section} title="¿Quién puso la plata?" />
-        <View style={styles.chipsRow}>
-          {participants.map((person) => (
-            <Chip
-              key={person.id}
-              label={person.name}
-              onPress={() => setFromId(person.id)}
-              selected={fromId === person.id}
-            />
-          ))}
-        </View>
+        <SearchField onChangeText={setPersonQuery} value={personQuery} />
+        {filteredParticipants.length === 0 ? (
+          <Text style={styles.hint}>No se encontraron personas.</Text>
+        ) : (
+          <>
+            <SectionTitle style={styles.section} title="¿Quién puso la plata?" />
+            <View style={styles.chipsRow}>
+              {filteredParticipants.map((person) => (
+                <Chip
+                  key={person.id}
+                  label={person.name}
+                  onPress={() => setFromId(person.id)}
+                  selected={fromId === person.id}
+                />
+              ))}
+            </View>
 
-        <SectionTitle style={styles.section} title="¿Quién la recibió?" />
-        <View style={styles.chipsRow}>
-          {participants.map((person) => (
-            <Chip
-              key={person.id}
-              label={person.name}
-              onPress={() => setToId(person.id)}
-              selected={toId === person.id}
-            />
-          ))}
-        </View>
-        <Text style={styles.hint}>El pago se descuenta de las liquidaciones pendientes.</Text>
+            <SectionTitle style={styles.section} title="¿Quién la recibió?" />
+            <View style={styles.chipsRow}>
+              {filteredParticipants.map((person) => (
+                <Chip
+                  key={person.id}
+                  label={person.name}
+                  onPress={() => setToId(person.id)}
+                  selected={toId === person.id}
+                />
+              ))}
+            </View>
+            <Text style={styles.hint}>El pago se descuenta de las liquidaciones pendientes.</Text>
+          </>
+        )}
       </ScrollView>
       <View style={styles.footer}>
         <Button loading={saving} onPress={submit} title="Registrar pago" />
