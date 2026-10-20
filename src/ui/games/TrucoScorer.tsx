@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -18,7 +18,7 @@ import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
   match: Match;
@@ -43,6 +43,8 @@ function parsePoints(text: string): number {
 }
 
 export function TrucoScorer({ match, nameOf, onStatusChange }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [rounds, setRounds] = useState<TrucoRound[] | null>(null);
   const [status, setStatus] = useState(match.status);
@@ -232,7 +234,7 @@ export function TrucoScorer({ match, nameOf, onStatusChange }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   scoreboard: {
     flexDirection: 'row',
     padding: spacing.sm,
@@ -243,7 +245,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   scoreColumnWinner: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: colors.successSoft,
     borderRadius: 12,
   },
   scoreDivider: {

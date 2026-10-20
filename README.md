@@ -8,11 +8,11 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Expo Router (file-based navigation, typed routes)
 - expo-sqlite (local database with versioned migrations)
 - expo-crypto (UUIDs), dayjs (dates)
-- Jest + ts-jest (domain unit tests), ESLint (`eslint-config-expo`)
+- Jest + jest-expo (babel-preset-expo transform; no ts-jest), ESLint (`eslint-config-expo`)
 
 ## Features (so far)
 
-- People and friend groups management
+- People and friend groups management (create, edit name/members, soft delete)
 - Create a juntada with participants (manual or from a saved group)
 - Record expenses: payer, amount, participants
 - Edit an existing expense; settlements and totals recompute automatically
@@ -21,6 +21,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Settlement: direct payments or debt minimization (default)
 - Share the settlement summary (total + pending transfers) as plain text to WhatsApp or any app
 - Juntadas list with date, participants and total spent
+- Light/dark theme that follows the device color scheme
 - SQLite persistence with migrations
 - Games module (per juntada, multiple matches per game, live scorer + stored history):
   - Truco: team score to 30 (15 malas + 15 buenas), 1v1/2v2/3v3 with team assignment, one form with a points input per team per hand, undo last hand

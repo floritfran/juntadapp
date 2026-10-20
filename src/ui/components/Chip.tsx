@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
-import { colors, fontSize, radius, spacing } from '../theme';
+import { fontSize, radius, spacing, useColors, type Colors } from '../theme';
 
 interface Props {
   label: string;
@@ -10,6 +11,8 @@ interface Props {
 }
 
 export function Chip({ label, selected = false, onPress, style }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const content = (
     <Text style={[styles.label, selected && styles.labelSelected]} numberOfLines={1}>
       {label}
@@ -34,9 +37,9 @@ export function Chip({ label, selected = false, onPress, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   chip: {
-    backgroundColor: '#EEF0F4',
+    backgroundColor: colors.surfaceAlt,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -18,7 +18,7 @@ import { listTrucoRounds } from '@/infrastructure/persistence/truco-repository';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { EmptyState } from '@/ui/components/EmptyState';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
   getTogetherId: string;
@@ -34,6 +34,8 @@ function teamLabel(team: TrucoTeam): string {
 }
 
 export function GamesSection({ getTogetherId }: Props) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const [cards, setCards] = useState<MatchCardData[] | null>(null);
   const [nameById, setNameById] = useState<Map<string, string>>(new Map());
@@ -195,7 +197,7 @@ function groupByPlayer<T extends { personId: string }>(entries: T[]): Record<str
   return map;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   header: {
     marginBottom: spacing.md,
   },
@@ -228,7 +230,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   badgeDone: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   badgeText: {
     fontSize: fontSize.sm,

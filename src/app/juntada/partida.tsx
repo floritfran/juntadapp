@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
@@ -15,9 +15,11 @@ import { GeneralaScorer } from '@/ui/games/GeneralaScorer';
 import { GenericScorer } from '@/ui/games/GenericScorer';
 import { SkullKingScorer } from '@/ui/games/SkullKingScorer';
 import { TrucoScorer } from '@/ui/games/TrucoScorer';
-import { colors, fontSize, spacing } from '@/ui/theme';
+import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 export default function PartidaScreen() {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
   const { match: matchId } = useLocalSearchParams<{ match: string }>();
   const [match, setMatch] = useState<Match | null>(null);
@@ -110,7 +112,7 @@ const nameOf = (personId: string) => nameById.get(personId) ?? 'Persona eliminad
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: Colors) => StyleSheet.create({
   loading: {
     flex: 1,
     alignItems: 'center',
@@ -143,7 +145,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primarySoft,
   },
   badgeDone: {
-    backgroundColor: '#E5E7EB',
+    backgroundColor: colors.border,
   },
   badgeText: {
     fontSize: fontSize.sm,
