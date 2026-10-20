@@ -1,6 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -10,6 +19,7 @@ import {
   minimizeTransfers,
 } from '@/domain/expenses/expense-calculator';
 import { Expense, Settlement, Transfer } from '@/domain/expenses/expense-types';
+import { buildSettlementSummaryText } from '@/domain/expenses/settlement-summary';
 import { GetTogether } from '@/domain/get-togethers/get-together-types';
 import { Person, PersonId } from '@/domain/people/person-types';
 import { listExpenses, softDeleteExpense } from '@/infrastructure/persistence/expenses-repository';
@@ -127,6 +137,24 @@ export default function JuntadaDetailScreen() {
         amount: String(transfer.amount),
       },
     });
+
+  const shareSettlement = async () => {
+    if (!getTogether) return;
+    const text = buildSettlementSummaryText({
+      title: getTogether.name,
+      totalInt: total,
+      transfers: transfers.map((transfer) => ({
+        fromName: nameOf(transfer.from),
+        toName: nameOf(transfer.to),
+        amount: transfer.amount,
+      })),
+    });
+    try {
+      await Share.share({ message: text });
+    } catch {
+      // Share cancelled or unavailable; nothing to do.
+    }
+  };
 
   if (notFound) {
     return (
@@ -289,7 +317,17 @@ export default function JuntadaDetailScreen() {
               </>
             ) : null}
 
-            <SectionTitle style={styles.section} title="Liquidación" />
+            <View style={[styles.sectionRow, styles.section]}>
+              <SectionTitle style={styles.flex} title="Liquidación" />
+              {expenses.length > 0 ? (
+                <Button
+                  onPress={shareSettlement}
+                  style={styles.shareButton}
+                  title="Compartir"
+                  variant="secondary"
+                />
+              ) : null}
+            </View>
             {expenses.length === 0 || !hasDebts ? (
               <EmptyState
                 icon="checkmark-circle-outline"
@@ -431,6 +469,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   newExpenseButton: {
+    marginBottom: spacing.md,
+    minHeight: 44,
+  },
+  shareButton: {
     marginBottom: spacing.md,
     minHeight: 44,
   },

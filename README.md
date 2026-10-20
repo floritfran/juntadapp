@@ -19,6 +19,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Settle a debt: register a payment between two people that cancels the pending transfer
 - Equal split with deterministic integer remainder
 - Settlement: direct payments or debt minimization (default)
+- Share the settlement summary (total + pending transfers) as plain text to WhatsApp or any app
 - Juntadas list with date, participants and total spent
 - SQLite persistence with migrations
 - Games module (per juntada, multiple matches per game, live scorer + stored history):
