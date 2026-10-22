@@ -5,6 +5,8 @@ import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { GAME_LABELS, Match, TrucoTeam } from '@/domain/games/game-types';
+import { cupChampion, leagueStandings, nextPlayableGame } from '@/domain/games/fifa/fifa-scorer';
+import { getFifaTournament } from '@/infrastructure/persistence/fifa-repository';
 import { computeTrucoScore } from '@/domain/games/truco/truco-scorer';
 import { computeGeneralaTotals, generalaWinners } from '@/domain/games/generala/generala-scorer';
 import { genericTotals } from '@/domain/games/generic/generic-scorer';
@@ -95,7 +97,7 @@ export function GamesSection({ getTogetherId }: Props) {
       {cards.length === 0 ? (
         <EmptyState
           icon="game-controller-outline"
-          message="Elegí Truco, Generala, Skull King o Juego genérico y cargá los jugadores para empezar."
+          message="Elegí Truco, Generala, Skull King, FIFA o Juego genérico y cargá los jugadores para empezar."
           title="Sin partidas todavía"
         />
       ) : (
@@ -166,6 +168,28 @@ async function summarize(
       return `${winners.length > 1 ? 'Empataron' : 'Ganó'} ${who} · ${best} pts`;
     }
     return `${entries.length}/${order.length * 11} casilleros cargados`;
+  }
+  if (match.game === 'fifa') {
+    const tournament = await getFifaTournament(db, match.id);
+    if (!tournament) return 'Sin datos del torneo';
+    if (tournament.mode === 'cup') {
+      const champion = cupChampion(tournament.games);
+      if (champion) return `Copa · Campeón: ${nameOf(champion)}`;
+      const next = nextPlayableGame(tournament.games);
+      if (!next?.player1Id || !next.player2Id) return 'Copa · Sin partidos pendientes';
+      return `Copa · Próximo: ${nameOf(next.player1Id)} vs ${nameOf(next.player2Id)}`;
+    }
+    const standings = leagueStandings(
+      match.players.map((player) => player.personId),
+      tournament.games
+    );
+    const leader = standings[0];
+    if (match.status === 'finished' && leader) {
+      return `Liga finalizada · Líder: ${nameOf(leader.personId)} (${leader.points} pts)`;
+    }
+    const next = nextPlayableGame(tournament.games);
+    if (!next?.player1Id || !next.player2Id) return 'Liga · Sin partidos pendientes';
+    return `Liga · Próximo: ${nameOf(next.player1Id)} vs ${nameOf(next.player2Id)}`;
   }
   if (match.game === 'generic') {
     const adjustments = await listGenericAdjustments(db, match.id);

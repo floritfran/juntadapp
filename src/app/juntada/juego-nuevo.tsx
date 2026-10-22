@@ -5,7 +5,9 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import { matchesQuery } from '@/domain/common/text-search';
 import { GAME_LABELS, GameId, TrucoTeam, TrucoTeamSize } from '@/domain/games/game-types';
+import { FIFA_MODE_LABELS, FifaMode } from '@/domain/games/fifa/fifa-types';
 import { validateTrucoTeamSetup } from '@/domain/games/truco/truco-scorer';
+import { createFifaTournament } from '@/infrastructure/persistence/fifa-repository';
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
 import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { createMatch } from '@/infrastructure/persistence/matches-repository';
@@ -20,8 +22,9 @@ import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
-const GAMES: GameId[] = ['truco', 'generala', 'skull-king', 'generic'];
+const GAMES: GameId[] = ['truco', 'generala', 'skull-king', 'fifa', 'generic'];
 const TEAM_SIZES: TrucoTeamSize[] = [1, 2, 3];
+const FIFA_MODES: FifaMode[] = ['league', 'cup'];
 
 function defaultTeams(ids: string[], teamSize: TrucoTeamSize): Record<string, TrucoTeam> {
   const teams: Record<string, TrucoTeam> = {};
@@ -43,6 +46,7 @@ export default function NuevaPartidaScreen() {
     GAMES.includes(gameParam as GameId) ? (gameParam as GameId) : 'truco'
   );
   const [teamSize, setTeamSize] = useState<TrucoTeamSize>(2);
+  const [fifaMode, setFifaMode] = useState<FifaMode>('league');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [teamByPerson, setTeamByPerson] = useState<Record<string, TrucoTeam>>({});
@@ -128,6 +132,10 @@ export default function NuevaPartidaScreen() {
       Alert.alert('Sin jugadores', 'Skull King necesita al menos 2 jugadores.');
       return;
     }
+    if (game === 'fifa' && selectedIds.length < 2) {
+      Alert.alert('Sin jugadores', 'FIFA necesita al menos 2 jugadores.');
+      return;
+    }
     if (game === 'generic' && selectedIds.length < 2) {
       Alert.alert('Sin jugadores', 'El juego genérico necesita al menos 2 jugadores.');
       return;
@@ -157,6 +165,13 @@ export default function NuevaPartidaScreen() {
           team: game === 'truco' ? (teamByPerson[personId] ?? 1) : null,
         })),
       });
+      if (game === 'fifa') {
+        await createFifaTournament(db, {
+          matchId: match.id,
+          mode: fifaMode,
+          playerIds: selectedIds,
+        });
+      }
       router.replace({ pathname: '/juntada/partida', params: { match: match.id } });
     } catch {
       Alert.alert('Error', 'No se pudo crear la partida.');
@@ -202,6 +217,27 @@ export default function NuevaPartidaScreen() {
                 />
               ))}
             </View>
+          </>
+        ) : null}
+
+        {game === 'fifa' ? (
+          <>
+            <SectionTitle style={styles.section} title="Modo" />
+            <View style={styles.chipsRow}>
+              {FIFA_MODES.map((mode) => (
+                <Chip
+                  key={mode}
+                  label={FIFA_MODE_LABELS[mode]}
+                  onPress={() => setFifaMode(mode)}
+                  selected={fifaMode === mode}
+                />
+              ))}
+            </View>
+            <Text style={styles.counter}>
+              {fifaMode === 'league'
+                ? 'Liga infinita: se juega fecha tras fecha y la tabla se actualiza siempre.'
+                : 'Copa: eliminación directa; si hay empate se define por penales.'}
+            </Text>
           </>
         ) : null}
 

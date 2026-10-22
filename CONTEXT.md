@@ -82,10 +82,10 @@ State of each feature and the exact files that implement it. Start here to know 
 
 ### 5. Games / matches (complete)
 
-- Matches per juntada: Truco, Generala, Skull King, Generic. Live scorer, history, multiple matches per game.
-- Domain (pure rules, unit-tested): `src/domain/games/game-types.ts` (`GameId`, `GAME_LABELS`, `Match`, `MatchPlayer`, `TrucoTeam(Size)`) + one folder per game (`truco/`, `generala/`, `skull-king/`, `generic/`) with scorer + types.
-- Repos: shared `matches-repository.ts` (`matches` + `match_players`, HARD delete with cascade — no soft delete for games), one repo per game (`truco-repository.ts`, `generala-repository.ts`, `skull-king-repository.ts`, `generic-repository.ts`).
-- UI: setup `src/app/juntada/juego-nuevo.tsx` (modal `?id=` + optional `?game=` preselect; player selection with SearchField), scorer dispatch `src/app/juntada/partida.tsx` (`?match=`; branches on `match.game`), scorer components `src/ui/games/{TrucoScorer,GeneralaScorer,SkullKingScorer,GenericScorer}.tsx`, match list + delete `src/ui/games/GamesSection.tsx` (rendered by `[id].tsx` under Juegos).
+- Matches per juntada: Truco, Generala, Skull King, FIFA (Liga/Copa), Generic. Live scorer, history, multiple matches per game.
+- Domain (pure rules, unit-tested): `src/domain/games/game-types.ts` (`GameId`, `GAME_LABELS`, `Match`, `MatchPlayer`, `TrucoTeam(Size)`) + one folder per game (`truco/`, `generala/`, `skull-king/`, `fifa/`, `generic/`) with scorer + types.
+- Repos: shared `matches-repository.ts` (`matches` + `match_players`, HARD delete with cascade — no soft delete for games), one repo per game (`truco-repository.ts`, `generala-repository.ts`, `skull-king-repository.ts`, `fifa-repository.ts`, `generic-repository.ts`).
+- UI: setup `src/app/juntada/juego-nuevo.tsx` (modal `?id=` + optional `?game=` preselect; player selection with SearchField), scorer dispatch `src/app/juntada/partida.tsx` (`?match=`; branches on `match.game`), scorer components `src/ui/games/{TrucoScorer,GeneralaScorer,SkullKingScorer,FifaScorer,GenericScorer}.tsx`, match list + delete `src/ui/games/GamesSection.tsx` (rendered by `[id].tsx` under Juegos).
 - Rules live ONLY in domain; screens never compute scores (see Supported Games for the actual rules).
 - Match players/teams cannot be edited after creation (delete + re-create).
 
@@ -124,13 +124,13 @@ src/app/AppRoot.tsx - EMPTY vestigial file, not mounted anywhere (safe to ignore
 src/domain         - pure business logic
   /common/         - Money.ts (formatMoneyInt), text-search.ts (normalizeForSearch/matchesQuery)
   /expenses/       - expense-calculator, expense-types, settlement-summary
-  /games/          - game-types + truco/ generala/ skull-king/ generic/ (each: scorer + types)
+  /games/          - game-types + truco/ generala/ skull-king/ fifa/ generic/ (each: scorer + types)
   /get-togethers/  - get-together-types
   /groups/         - group-types
   /people/         - person-types
 src/infrastructure
   /persistence/    - migrations.ts + repositories: people, groups, get-togethers, expenses,
-                     settlements, matches, truco, generala, skull-king, generic
+                     settlements, matches, truco, generala, skull-king, fifa, generic
   /id.ts           - UUID generator
 src/ui
   /components/     - Button, Card, CheckRow, Chip, EmptyState, Screen, SearchField, SectionTitle, TextField
@@ -152,10 +152,10 @@ CONTEXT.md         - this file; README.md - developer overview; diseño.md - ori
 - Balance (personId, net = paid - owes)
 - Transfer (from, to, amount)
 - Settlement (id, getTogetherId, fromId, toId, amountInt, timestamps, deletedAt)
-- Match (id, getTogetherId, game truco|generala|skull-king|generic, status active|finished, teamSize for truco, players snapshot with team, timestamps)
-- Game-specific: TrucoRound (team1Points, team2Points), GeneralaEntry (box, points, tachado), SkullKingRoundEntry (round, bid, tricks, bonus), GenericAdjustment (personId, points)
+- Match (id, getTogetherId, game truco|generala|skull-king|fifa|generic, status active|finished, teamSize for truco, players snapshot with team, timestamps)
+- Game-specific: TrucoRound (team1Points, team2Points), GeneralaEntry (box, points, tachado), SkullKingRoundEntry (round, bid, tricks, bonus), FifaGame (round, slot, players, scores, penalty winner), GenericAdjustment (personId, points)
 
-## Data Model (SQLite, migrations v1–v5)
+## Data Model (SQLite, migrations v1–v6)
 
 Timestamps are INTEGER epoch milliseconds. Soft deletes via `deleted_at` for money/people data; games are hard-deleted (cascade).
 
@@ -190,6 +190,12 @@ v5 (debt settlements):
 
 - settlements(id, get_together_id, from_id, to_id, amount_int, created_at, updated_at, deleted_at)
 
+v6 (FIFA tournaments):
+
+- fifa_tournaments(match_id PK, mode league|cup, created_at)
+- fifa_games(id, match_id, round, slot, player1_id, player2_id, score1, score2, penalty_winner_id, played_at, UNIQUE(match_id, round, slot)) + index on match_id
+- Nullable players represent cup slots still waiting for a winner; league rounds are appended lazily as the previous one is completed
+
 `position` preserves participant order (it decides who absorbs the split remainder).
 
 ## Main Business Rules
@@ -221,6 +227,10 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 - Truco: score per team to 30, split display 15 malas + 15 buenas, 1v1/2v2/3v3. Each hand is a single form with one numeric input per team; the hand adds its points to both totals at once. First to reach 30 wins (overshoot allowed).
 - Generala: standard Argentine scoring sheet (11 boxes). Upper section 1-6 free entry, +35 bonus when the upper sum is >= 63. Lower boxes use fixed values chosen on entry: escalera 20/25, full 30/35, poker 40/45, generala 50/55, doble generala 100/105. Any box can be tachado (= 0). Sequential turns: the app shows whose turn it is; the current player loads points + box, then the turn passes to the player with the fewest filled boxes (complete sheets are skipped). Game ends when every player filled all 11 boxes.
 - Skull King: 10 rounds; round N => N cards, so bids and tricks are capped by the round number. Per player bid + tricks + bonus. Exact bid 0 => +10 * round; exact bid N => 20*N; miss => -10 * |bid - tricks|, except a missed 0 bid which always costs -10 * round. Bonuses only apply when the bid is exact: combat presets (Sirena beats Skull King +40, Pirata beats Sirena +20, Skull King beats Pirata +30, repeatable) plus a free +/- amount field.
+- FIFA: tournament for 1v1 matches with manually entered goals. Two modes:
+  - Liga (infinite): a round-robin round is generated on demand using the circle method (odd player counts rest one per fecha). When every game in the current fecha is played, the next fecha is appended automatically. Standings: PJ/PG/PE/PP/GF/GC/DIF/PTS, win 3 / draw 1 / loss 0; tie-break by goal difference, then goals for, then participant order. User closes the league manually (or reopens it).
+  - Copa: single elimination with automatic byes for non-power-of-two participant counts (standard seed order). Winners advance automatically to the next round; finals crown a champion and finish the match. Ties require a penalty winner.
+  - Both modes always surface the next playable game and keep the full match history. `src/domain/games/fifa/fifa-scorer.ts` holds pure rules; `fifa-repository.ts` persists rounds/bracket and advances cup winners.
 - Generic: free-form scorekeeper for any other game. Players add integer adjustments (non-zero); totals rank the players (sorted desc, ties share the lead). Used for games without dedicated rules.
 
 ## Games Architecture
@@ -348,7 +358,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - `diseño.md` - original product requirements (Spanish)
 - `src/domain/expenses/expense-calculator.ts` - splits, balances, transfers
 - `src/domain/common/text-search.ts` - search normalization + matchesQuery
-- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v5
+- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v6
 - `src/app/_layout.tsx` - root layout (SQLiteProvider + ThemeProvider + Stack)
 - `src/app/juntada/[id].tsx` - juntada detail (Liquidación + Gastos | Juegos)
 - `src/ui/theme.tsx` - palettes, spacing scale, ThemeProvider + useColors
@@ -360,8 +370,8 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - Expense domain + tests, settlements + debt minimization + share summary
 - SQLite schema/migrations v1–v5 + all repositories
 - Full UI: juntadas list/create/detail, expenses create/edit/delete, payments, people/groups with inline edit, search everywhere
-- Games module: Truco, Generala, Skull King, Generic (domain + tests + repositories + scorers + match list)
+- Games module: Truco, Generala, Skull King, FIFA (Liga infinita / Copa), Generic (domain + tests + repositories + scorers + match list)
 - Light/dark theme follows the device color scheme
-- All checks green: `npm test` (74 tests), `npm run lint`, `npm run typecheck`
+- All checks green: `npm test` (96 tests), `npm run lint`, `npm run typecheck`
 
 Next steps (see Future Features): close/reopen juntadas + date picker, then game statistics.
