@@ -9,7 +9,9 @@ import {
   applyCupResult,
   cupChampion,
   fifaGameWinner,
+  isLeagueComplete,
   leagueStandings,
+  leagueTotalRounds,
   nextLeagueRoundIndex,
   nextPlayableGame,
   validateFifaResult,
@@ -42,8 +44,15 @@ function parseScore(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function roundLabel(round: number, totalRounds: number, mode: FifaMode): string {
-  if (mode === 'league') return `Fecha ${round + 1}`;
+function roundLabel(
+  round: number,
+  totalRounds: number,
+  mode: FifaMode,
+  leagueTotal: number | null = null
+): string {
+  if (mode === 'league') {
+    return leagueTotal === null ? `Fecha ${round + 1}` : `Fecha ${round + 1}/${leagueTotal}`;
+  }
   const remaining = totalRounds - 1 - round;
   if (remaining === 0) return 'Final';
   if (remaining === 1) return 'Semifinales';
@@ -92,6 +101,13 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
     .filter((game) => game.score1 !== null && game.score2 !== null)
     .sort((a, b) => b.round - a.round || b.slot - a.slot);
   const totalRounds = games.length > 0 ? Math.max(...games.map((game) => game.round)) + 1 : 0;
+  const leagueTotal =
+    mode === 'league'
+      ? leagueTotalRounds(playerIds.length, tournament.matchesPerOpponent)
+      : null;
+  const leagueComplete =
+    mode === 'league' &&
+    isLeagueComplete(games, playerIds.length, tournament.matchesPerOpponent);
 
   const parsedScore1 = parseScore(score1Input);
   const parsedScore2 = parseScore(score2Input);
@@ -134,11 +150,18 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
         await saveFifaResult(db, { matchId: match.id, gameId: nextGame.id, result });
         const refreshed = await getFifaTournament(db, match.id);
         if (refreshed && !nextPlayableGame(refreshed.games)) {
-          await appendFifaLeagueRound(db, {
-            matchId: match.id,
-            playerIds,
-            roundIndex: nextLeagueRoundIndex(refreshed.games),
-          });
+          const nextRound = nextLeagueRoundIndex(refreshed.games);
+          const total = leagueTotalRounds(playerIds.length, refreshed.matchesPerOpponent);
+          if (total !== null && nextRound >= total) {
+            await finishMatch(db, match.id);
+            changeStatus('finished');
+          } else {
+            await appendFifaLeagueRound(db, {
+              matchId: match.id,
+              playerIds,
+              roundIndex: nextRound,
+            });
+          }
         }
       } else {
         const plan = applyCupResult(games, nextGame.id, result);
@@ -188,7 +211,8 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
     ]);
   };
 
-  const canPlay = status === 'active' && nextGame !== null && champion === null;
+  const canPlay =
+    status === 'active' && nextGame !== null && champion === null && !leagueComplete;
 
   return (
     <View>
@@ -198,7 +222,7 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
         </View>
       ) : null}
 
-      {!champion && status === 'finished' ? (
+      {!champion && (status === 'finished' || leagueComplete) ? (
         <View style={styles.finishedBanner}>
           <Text style={styles.finishedText}>Liga finalizada</Text>
         </View>
@@ -209,7 +233,16 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
           <SectionTitle title="Próximo partido" />
           <Card style={styles.nextCard}>
             <Text style={styles.nextRound}>
-              {FIFA_MODE_LABELS[mode]} · {roundLabel(nextGame.round, totalRounds, mode)}
+              {FIFA_MODE_LABELS[mode]}
+              {mode === 'league'
+                ? ` · ${
+                    tournament.matchesPerOpponent === null
+                      ? 'Sin límite'
+                      : `${tournament.matchesPerOpponent} vs c/u`
+                  }`
+                : ''}
+              {' · '}
+              {roundLabel(nextGame.round, totalRounds, mode, leagueTotal)}
             </Text>
             <View style={styles.scoreRow}>
               <View style={styles.flex}>
@@ -294,12 +327,14 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
             ))}
           </Card>
 
-          <Button
-            onPress={toggleStatus}
-            style={styles.statusButton}
-            title={status === 'finished' ? 'Reabrir liga' : 'Finalizar liga'}
-            variant="secondary"
-          />
+          {leagueComplete && status === 'finished' ? null : (
+            <Button
+              onPress={toggleStatus}
+              style={styles.statusButton}
+              title={status === 'finished' ? 'Reabrir liga' : 'Finalizar liga'}
+              variant="secondary"
+            />
+          )}
         </>
       ) : null}
 
@@ -351,7 +386,7 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
         playedGames.map((game) => (
           <View key={game.id} style={styles.historyRow}>
             <Text style={styles.historyRound}>
-              {roundLabel(game.round, totalRounds, mode)}
+              {roundLabel(game.round, totalRounds, mode, leagueTotal)}
             </Text>
             <Text numberOfLines={1} style={[styles.historyResult, styles.flex]}>
               {game.player1Id ? nameOf(game.player1Id) : '?'} {game.score1} - {game.score2}{' '}

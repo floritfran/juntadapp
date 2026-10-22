@@ -6,11 +6,16 @@ import {
   FifaMode,
   FifaResult,
 } from '../../domain/games/fifa/fifa-types';
-import { cupBracketPlan, leagueRoundPlan } from '../../domain/games/fifa/fifa-scorer';
+import {
+  cupBracketPlan,
+  leagueRoundPlan,
+  validateMatchesPerOpponent,
+} from '../../domain/games/fifa/fifa-scorer';
 import { newId } from '../id';
 
 export interface FifaTournament {
   mode: FifaMode;
+  matchesPerOpponent: number | null;
   games: FifaGame[];
 }
 
@@ -23,6 +28,7 @@ export interface FifaAdvance {
 
 interface FifaTournamentRow {
   mode: string;
+  matches_per_opponent: number | null;
 }
 
 interface FifaGameRow {
@@ -56,7 +62,7 @@ export async function getFifaTournament(
   matchId: MatchId
 ): Promise<FifaTournament | null> {
   const tournament = await db.getFirstAsync<FifaTournamentRow>(
-    'SELECT mode FROM fifa_tournaments WHERE match_id = ?',
+    'SELECT mode, matches_per_opponent FROM fifa_tournaments WHERE match_id = ?',
     matchId
   );
   if (!tournament) return null;
@@ -70,6 +76,7 @@ export async function getFifaTournament(
   );
   return {
     mode: tournament.mode as FifaMode,
+    matchesPerOpponent: tournament.matches_per_opponent ?? null,
     games: rows.map(rowToFifaGame),
   };
 }
@@ -96,8 +103,15 @@ async function insertGames(
 
 export async function createFifaTournament(
   db: SQLiteDatabase,
-  input: { matchId: MatchId; mode: FifaMode; playerIds: PersonId[] }
+  input: {
+    matchId: MatchId;
+    mode: FifaMode;
+    playerIds: PersonId[];
+    matchesPerOpponent?: number | null;
+  }
 ): Promise<FifaTournament> {
+  const matchesPerOpponent = input.mode === 'league' ? (input.matchesPerOpponent ?? null) : null;
+  validateMatchesPerOpponent(matchesPerOpponent);
   const plans =
     input.mode === 'league'
       ? leagueRoundPlan(input.playerIds, 0)
@@ -105,9 +119,11 @@ export async function createFifaTournament(
 
   await db.withTransactionAsync(async () => {
     await db.runAsync(
-      'INSERT INTO fifa_tournaments (match_id, mode, created_at) VALUES (?, ?, ?)',
+      `INSERT INTO fifa_tournaments (match_id, mode, matches_per_opponent, created_at)
+       VALUES (?, ?, ?, ?)`,
       input.matchId,
       input.mode,
+      matchesPerOpponent,
       Date.now()
     );
     await insertGames(db, input.matchId, plans);

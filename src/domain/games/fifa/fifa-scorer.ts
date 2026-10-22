@@ -78,6 +78,35 @@ export function leagueRoundPlan(
   return games;
 }
 
+export function validateMatchesPerOpponent(value: number | null): void {
+  if (value === null) return;
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error('matches per opponent must be a positive integer or null');
+  }
+}
+
+export function leagueTotalRounds(
+  playerCount: number,
+  matchesPerOpponent: number | null
+): number | null {
+  if (matchesPerOpponent === null) return null;
+  if (playerCount < 2) return null;
+  const paddedCount = playerCount % 2 === 0 ? playerCount : playerCount + 1;
+  return (paddedCount - 1) * matchesPerOpponent;
+}
+
+export function isLeagueComplete(
+  games: readonly FifaGame[],
+  playerCount: number,
+  matchesPerOpponent: number | null
+): boolean {
+  const totalRounds = leagueTotalRounds(playerCount, matchesPerOpponent);
+  if (totalRounds === null || games.length === 0) return false;
+  const lastRound = Math.max(...games.map((game) => game.round));
+  if (lastRound < totalRounds - 1) return false;
+  return games.every((game) => game.score1 !== null && game.score2 !== null);
+}
+
 export function nextLeagueRoundIndex(games: readonly FifaGame[]): number {
   if (games.length === 0) return 0;
   return Math.max(...games.map((game) => game.round)) + 1;
