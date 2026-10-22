@@ -155,7 +155,7 @@ CONTEXT.md         - this file; README.md - developer overview; diseño.md - ori
 - Match (id, getTogetherId, game truco|generala|skull-king|fifa|generic, status active|finished, teamSize for truco, players snapshot with team, timestamps)
 - Game-specific: TrucoRound (team1Points, team2Points), GeneralaEntry (box, points, tachado), SkullKingRoundEntry (round, bid, tricks, bonus), FifaGame (round, slot, players, scores, penalty winner), GenericAdjustment (personId, points)
 
-## Data Model (SQLite, migrations v1–v6)
+## Data Model (SQLite, migrations v1–v7)
 
 Timestamps are INTEGER epoch milliseconds. Soft deletes via `deleted_at` for money/people data; games are hard-deleted (cascade).
 
@@ -196,6 +196,10 @@ v6 (FIFA tournaments):
 - fifa_games(id, match_id, round, slot, player1_id, player2_id, score1, score2, penalty_winner_id, played_at, UNIQUE(match_id, round, slot)) + index on match_id
 - Nullable players represent cup slots still waiting for a winner; league rounds are appended lazily as the previous one is completed
 
+v7 (FIFA matches per opponent):
+
+- fifa_tournaments.matches_per_opponent INTEGER NULL — `NULL` means infinite league (previous behavior); a positive integer means that many full round-robin cycles before the league auto-finishes
+
 `position` preserves participant order (it decides who absorbs the split remainder).
 
 ## Main Business Rules
@@ -228,7 +232,7 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 - Generala: standard Argentine scoring sheet (11 boxes). Upper section 1-6 free entry, +35 bonus when the upper sum is >= 63. Lower boxes use fixed values chosen on entry: escalera 20/25, full 30/35, poker 40/45, generala 50/55, doble generala 100/105. Any box can be tachado (= 0). Sequential turns: the app shows whose turn it is; the current player loads points + box, then the turn passes to the player with the fewest filled boxes (complete sheets are skipped). Game ends when every player filled all 11 boxes.
 - Skull King: 10 rounds; round N => N cards, so bids and tricks are capped by the round number. Per player bid + tricks + bonus. Exact bid 0 => +10 * round; exact bid N => 20*N; miss => -10 * |bid - tricks|, except a missed 0 bid which always costs -10 * round. Bonuses only apply when the bid is exact: combat presets (Sirena beats Skull King +40, Pirata beats Sirena +20, Skull King beats Pirata +30, repeatable) plus a free +/- amount field.
 - FIFA: tournament for 1v1 matches with manually entered goals. Two modes:
-  - Liga (infinite): a round-robin round is generated on demand using the circle method (odd player counts rest one per fecha). When every game in the current fecha is played, the next fecha is appended automatically. Standings: PJ/PG/PE/PP/GF/GC/DIF/PTS, win 3 / draw 1 / loss 0; tie-break by goal difference, then goals for, then participant order. User closes the league manually (or reopens it).
+  - Liga: a round-robin round is generated on demand using the circle method (odd player counts rest one per fecha). "Partidos contra cada equipo" is configurable at creation: `null` = infinite (default, rounds keep being appended until the user closes the league), or a positive integer k = fixed schedule of k full round-robin cycles; when the last fecha is played the league finishes automatically. Standings: PJ/PG/PE/PP/GF/GC/DIF/PTS, win 3 / draw 1 / loss 0; tie-break by goal difference, then goals for, then participant order.
   - Copa: single elimination with automatic byes for non-power-of-two participant counts (standard seed order). Winners advance automatically to the next round; finals crown a champion and finish the match. Ties require a penalty winner.
   - Both modes always surface the next playable game and keep the full match history. `src/domain/games/fifa/fifa-scorer.ts` holds pure rules; `fifa-repository.ts` persists rounds/bracket and advances cup winners.
 - Generic: free-form scorekeeper for any other game. Players add integer adjustments (non-zero); totals rank the players (sorted desc, ties share the lead). Used for games without dedicated rules.
@@ -358,7 +362,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - `diseño.md` - original product requirements (Spanish)
 - `src/domain/expenses/expense-calculator.ts` - splits, balances, transfers
 - `src/domain/common/text-search.ts` - search normalization + matchesQuery
-- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v6
+- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v7
 - `src/app/_layout.tsx` - root layout (SQLiteProvider + ThemeProvider + Stack)
 - `src/app/juntada/[id].tsx` - juntada detail (Liquidación + Gastos | Juegos)
 - `src/ui/theme.tsx` - palettes, spacing scale, ThemeProvider + useColors
@@ -372,6 +376,6 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - Full UI: juntadas list/create/detail, expenses create/edit/delete, payments, people/groups with inline edit, search everywhere
 - Games module: Truco, Generala, Skull King, FIFA (Liga infinita / Copa), Generic (domain + tests + repositories + scorers + match list)
 - Light/dark theme follows the device color scheme
-- All checks green: `npm test` (96 tests), `npm run lint`, `npm run typecheck`
+- All checks green: `npm test` (101 tests), `npm run lint`, `npm run typecheck`
 
 Next steps (see Future Features): close/reopen juntadas + date picker, then game statistics.

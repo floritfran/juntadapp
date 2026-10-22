@@ -3,13 +3,16 @@ import {
   cupBracketPlan,
   cupChampion,
   fifaGameWinner,
+  isLeagueComplete,
   leagueRoundPlan,
   leagueStandings,
+  leagueTotalRounds,
   nextLeagueRoundIndex,
   nextPlayableGame,
   validateFifaResult,
   validateFifaScore,
   validateFifaScores,
+  validateMatchesPerOpponent,
 } from '../../../../src/domain/games/fifa/fifa-scorer';
 import {
   FifaGame,
@@ -122,6 +125,62 @@ describe('fifa - liga infinita', () => {
     ];
     expect(nextPlayableGame(games)?.id).toBe('g1');
     expect(nextPlayableGame([])).toBeNull();
+  });
+});
+
+describe('fifa - limite de partidos contra cada equipo', () => {
+  test('calcula las fechas totales por cantidad de jugadores y vueltas', () => {
+    expect(leagueTotalRounds(3, 1)).toBe(3);
+    expect(leagueTotalRounds(3, 2)).toBe(6);
+    expect(leagueTotalRounds(4, 1)).toBe(3);
+    expect(leagueTotalRounds(4, 2)).toBe(6);
+    expect(leagueTotalRounds(2, 5)).toBe(5);
+    expect(leagueTotalRounds(6, 1)).toBe(5);
+  });
+
+  test('sin limite devuelve null', () => {
+    expect(leagueTotalRounds(4, null)).toBeNull();
+    expect(leagueTotalRounds(1, 2)).toBeNull();
+  });
+
+  test('valida la cantidad configurada', () => {
+    expect(() => validateMatchesPerOpponent(null)).not.toThrow();
+    expect(() => validateMatchesPerOpponent(1)).not.toThrow();
+    expect(() => validateMatchesPerOpponent(3)).not.toThrow();
+    expect(() => validateMatchesPerOpponent(0)).toThrow();
+    expect(() => validateMatchesPerOpponent(-1)).toThrow();
+    expect(() => validateMatchesPerOpponent(1.5)).toThrow();
+  });
+
+  test('con 2 vueltas cada pareja se enfrenta dos veces', () => {
+    const plans = Array.from({ length: 6 }, (_, round) =>
+      leagueRoundPlan(['a', 'b', 'c'], round)
+    ).flat();
+    const counts = new Map<string, number>();
+    plans.forEach((plan) => {
+      const key = [plan.player1Id, plan.player2Id].sort().join('-');
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    expect([...counts.values()]).toEqual([2, 2, 2]);
+  });
+
+  test('la liga con limite termina al jugar todas las fechas', () => {
+    const plans = Array.from({ length: 6 }, (_, round) =>
+      leagueRoundPlan(['a', 'b', 'c'], round)
+    ).flat();
+    const played = plans.map((plan, index) =>
+      game(`g${index}`, plan, { score1: 1, score2: 0 })
+    );
+    expect(isLeagueComplete(played, 3, 2)).toBe(true);
+    expect(isLeagueComplete(played, 3, null)).toBe(false);
+
+    const pending = played.map((item, index) =>
+      index === played.length - 1 ? { ...item, score1: null, score2: null } : item
+    );
+    expect(isLeagueComplete(pending, 3, 2)).toBe(false);
+
+    const partial = played.filter((item) => item.round < 5);
+    expect(isLeagueComplete(partial, 3, 2)).toBe(false);
   });
 });
 

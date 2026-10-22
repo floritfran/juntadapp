@@ -190,6 +190,12 @@ CREATE TABLE fifa_games (
 CREATE INDEX idx_fifa_games_match ON fifa_games(match_id);
 `,
   },
+  {
+    version: 7,
+    sql: `
+ALTER TABLE fifa_tournaments ADD COLUMN matches_per_opponent INTEGER;
+`,
+  },
 ];
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {

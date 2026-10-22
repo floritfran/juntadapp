@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import { matchesQuery } from '@/domain/common/text-search';
 import { GAME_LABELS, GameId, TrucoTeam, TrucoTeamSize } from '@/domain/games/game-types';
 import { FIFA_MODE_LABELS, FifaMode } from '@/domain/games/fifa/fifa-types';
+import { leagueTotalRounds } from '@/domain/games/fifa/fifa-scorer';
 import { validateTrucoTeamSetup } from '@/domain/games/truco/truco-scorer';
 import { createFifaTournament } from '@/infrastructure/persistence/fifa-repository';
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
@@ -47,6 +48,7 @@ export default function NuevaPartidaScreen() {
   );
   const [teamSize, setTeamSize] = useState<TrucoTeamSize>(2);
   const [fifaMode, setFifaMode] = useState<FifaMode>('league');
+  const [matchesPerOpponent, setMatchesPerOpponent] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [teamByPerson, setTeamByPerson] = useState<Record<string, TrucoTeam>>({});
@@ -118,6 +120,7 @@ export default function NuevaPartidaScreen() {
   const team1Count = selectedIds.filter((personId) => teamByPerson[personId] === 1).length;
   const team2Count = selectedIds.length - team1Count;
   const expectedPlayers = teamSize * 2;
+  const totalLeagueRounds = leagueTotalRounds(selectedIds.length, matchesPerOpponent);
 
   const submit = async () => {
     if (selectedIds.length === 0) {
@@ -170,6 +173,7 @@ export default function NuevaPartidaScreen() {
           matchId: match.id,
           mode: fifaMode,
           playerIds: selectedIds,
+          matchesPerOpponent: fifaMode === 'league' ? matchesPerOpponent : null,
         });
       }
       router.replace({ pathname: '/juntada/partida', params: { match: match.id } });
@@ -233,11 +237,37 @@ export default function NuevaPartidaScreen() {
                 />
               ))}
             </View>
-            <Text style={styles.counter}>
-              {fifaMode === 'league'
-                ? 'Liga infinita: se juega fecha tras fecha y la tabla se actualiza siempre.'
-                : 'Copa: eliminación directa; si hay empate se define por penales.'}
-            </Text>
+            {fifaMode === 'league' ? (
+              <>
+                <SectionTitle style={styles.section} title="Partidos contra cada equipo" />
+                <View style={styles.chipsRow}>
+                  <Chip
+                    label="Sin límite"
+                    onPress={() => setMatchesPerOpponent(null)}
+                    selected={matchesPerOpponent === null}
+                  />
+                  {[1, 2, 3].map((value) => (
+                    <Chip
+                      key={value}
+                      label={String(value)}
+                      onPress={() => setMatchesPerOpponent(value)}
+                      selected={matchesPerOpponent === value}
+                    />
+                  ))}
+                </View>
+                <Text style={styles.counter}>
+                  {matchesPerOpponent === null
+                    ? 'Liga infinita: se juega fecha tras fecha hasta que la finalices.'
+                    : totalLeagueRounds === null
+                      ? `${matchesPerOpponent} partido(s) contra cada equipo.`
+                      : `${matchesPerOpponent} partido(s) contra cada equipo: se jugarán ${totalLeagueRounds} fechas.`}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.counter}>
+                Copa: eliminación directa; si hay empate se define por penales.
+              </Text>
+            )}
           </>
         ) : null}
 
