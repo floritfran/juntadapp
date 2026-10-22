@@ -37,7 +37,7 @@ export default function JuntadasScreen() {
   );
 
   return (
-    <Screen>
+    <Screen bottomInset={false}>
       {items === null ? (
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} size="large" />
