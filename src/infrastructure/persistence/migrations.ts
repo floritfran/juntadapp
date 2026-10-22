@@ -166,6 +166,30 @@ CREATE TABLE settlements (
 CREATE INDEX idx_settlements_get_together ON settlements(get_together_id);
 `,
   },
+  {
+    version: 6,
+    sql: `
+CREATE TABLE fifa_tournaments (
+  match_id TEXT PRIMARY KEY NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  mode TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE fifa_games (
+  id TEXT PRIMARY KEY NOT NULL,
+  match_id TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  round INTEGER NOT NULL,
+  slot INTEGER NOT NULL,
+  player1_id TEXT REFERENCES people(id),
+  player2_id TEXT REFERENCES people(id),
+  score1 INTEGER,
+  score2 INTEGER,
+  penalty_winner_id TEXT REFERENCES people(id),
+  played_at INTEGER,
+  UNIQUE (match_id, round, slot)
+);
+CREATE INDEX idx_fifa_games_match ON fifa_games(match_id);
+`,
+  },
 ];
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
