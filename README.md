@@ -30,6 +30,10 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
   - Skull King: 10 rounds of one card per player each (round N deals N cards), bid + tricks per player, automatic scoring (exact bid 0 = 10 x round, exact bid N = 20 x N, miss = -10 per unit, missed 0 bid = -10 x round), combat bonus presets and free +/- bonuses, round history with undo
   - FIFA: 1v1 tournament with manually entered goals, in Liga (round-robin with standings and automatic next fecha; configurable matches per opponent, infinite by default) or Copa (single elimination with byes, penalty winners for ties and automatic champion)
 
+## Download (APK)
+
+Latest Android build: [Google Drive folder](https://drive.google.com/drive/folders/1DPqvbT7XfL8JSFiTTsCJ9n_8GMVHz1lJ)
+
 ## Requirements
 
 - Node 20+, npm
