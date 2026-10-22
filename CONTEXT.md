@@ -112,7 +112,9 @@ State of each feature and the exact files that implement it. Start here to know 
 
 ## Shared UI Components (reuse before creating new ones)
 
-`src/ui/components/`: `Button` (variants incl. danger), `TextField` (with optional `icon` prop), `Card`, `CheckRow` (checkbox row), `Chip` (selectable, optional `loading`), `EmptyState` (icon + title + description), `Screen` (safe-area padded container), `SearchField`, `SectionTitle`. Format helpers in `src/ui/format.ts` (delegates to domain money).
+`src/ui/components/`: `Button` (variants incl. danger), `TextField` (with optional `icon` prop), `Card`, `CheckRow` (checkbox row), `Chip` (selectable, optional `loading`), `EmptyState` (icon + title + description), `Screen` (applies the bottom safe-area inset by default; pass `bottomInset={false}` inside tabs because the tab bar already handles it), `SearchField`, `SectionTitle`.
+
+Android runs edge-to-edge: stack/modal content extends under the system navigation bar. `Screen` adds `insets.bottom` padding so footers and scroll content stay accessible; do not remove it or add manual bottom padding to work around it. Format helpers in `src/ui/format.ts` (delegates to domain money).
 
 ## Folder Structure
 

@@ -200,7 +200,7 @@ export default function GruposScreen() {
 
   if (!ready) {
     return (
-      <Screen>
+      <Screen bottomInset={false}>
         <View style={styles.loading}>
           <ActivityIndicator color={colors.primary} size="large" />
         </View>
@@ -209,7 +209,7 @@ export default function GruposScreen() {
   }
 
   return (
-    <Screen>
+    <Screen bottomInset={false}>
       <ScrollView contentContainerStyle={styles.content}>
         <SectionTitle title="Personas" />
         <TextField
