@@ -19,6 +19,7 @@ export function SearchField({
       icon="search"
       label={label}
       onChangeText={onChangeText}
+      onClear={() => onChangeText('')}
       placeholder={placeholder}
       returnKeyType="search"
       value={value}

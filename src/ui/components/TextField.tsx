@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ComponentProps, useMemo } from 'react';
-import { StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 import { fontSize, radius, spacing, useColors, type Colors } from '../theme';
 
@@ -11,6 +11,8 @@ interface Props extends Pick<TextInputProps, 'keyboardType' | 'autoCapitalize' |
   placeholder?: string;
   error?: string | null;
   icon?: ComponentProps<typeof Ionicons>['name'];
+  onClear?: () => void;
+  clearAccessibilityLabel?: string;
 }
 
 export function TextField({
@@ -24,16 +26,19 @@ export function TextField({
   returnKeyType,
   onSubmitEditing,
   icon,
+  onClear,
+  clearAccessibilityLabel = 'Borrar búsqueda',
 }: Props) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const hasError = error != null && error !== '';
+  const showClear = onClear != null && value.length > 0;
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{label}</Text>
-      {icon ? (
+      {icon || onClear ? (
         <View style={[styles.input, hasError && styles.inputError, styles.inputRow]}>
-          <Ionicons color={colors.iconMuted} name={icon} size={20} />
+          {icon ? <Ionicons color={colors.iconMuted} name={icon} size={20} /> : null}
           <TextInput
             autoCapitalize={autoCapitalize}
             keyboardType={keyboardType}
@@ -45,6 +50,16 @@ export function TextField({
             style={styles.inputField}
             value={value}
           />
+          {showClear ? (
+            <Pressable
+              accessibilityLabel={clearAccessibilityLabel}
+              accessibilityRole="button"
+              hitSlop={10}
+              onPress={onClear}
+            >
+              <Ionicons color={colors.iconMuted} name="close-circle" size={20} />
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         <TextInput

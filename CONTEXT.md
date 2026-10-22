@@ -91,7 +91,7 @@ State of each feature and the exact files that implement it. Start here to know 
 
 ### 6. Search pattern (reusable)
 
-- `src/ui/components/SearchField.tsx` wraps `TextField` with `icon="search"` + `autoCapitalize="none"`.
+- `src/ui/components/SearchField.tsx` wraps `TextField` with `icon="search"` + `autoCapitalize="none"` and an X button (`close-circle`) that clears the query when the field has text.
 - Filtering is IN-MEMORY via `matchesQuery(text, query)` from `src/domain/common/text-search.ts` (NFD normalize, strip combining marks, lowercase — case- and accent-insensitive; implemented ASCII-only with `codePointAt`, see Gotchas).
 - Filtering never mutates selection state; when the filtered list is empty show `EmptyState` ("No se encontraron personas").
 - Already applied in: grupos people list + group member checkboxes, nueva participants, juego-nuevo players, ExpenseForm payer/participants, SettlementForm from/to.
@@ -112,7 +112,7 @@ State of each feature and the exact files that implement it. Start here to know 
 
 ## Shared UI Components (reuse before creating new ones)
 
-`src/ui/components/`: `Button` (variants incl. danger), `TextField` (with optional `icon` prop), `Card`, `CheckRow` (checkbox row), `Chip` (selectable, optional `loading`), `EmptyState` (icon + title + description), `Screen` (safe-area padded container), `SearchField`, `SectionTitle`. Format helpers in `src/ui/format.ts` (delegates to domain money).
+`src/ui/components/`: `Button` (variants incl. danger), `TextField` (optional `icon` and `onClear` X button), `Card`, `CheckRow` (checkbox row), `Chip` (selectable, optional `loading`), `EmptyState` (icon + title + description), `Screen` (safe-area padded container), `SearchField`, `SectionTitle`. Format helpers in `src/ui/format.ts` (delegates to domain money).
 
 ## Folder Structure
 

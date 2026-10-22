@@ -13,7 +13,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 ## Features (so far)
 
 - People and friend groups management (create, edit name/members, soft delete)
-- Search people by name (case- and accent-insensitive) in every people list
+- Search people by name (case- and accent-insensitive) in every people list, with a clear (X) button in the search field
 - Create a juntada with participants (manual or from a saved group)
 - Record expenses: payer, amount, participants
 - Edit an existing expense; settlements and totals recompute automatically
