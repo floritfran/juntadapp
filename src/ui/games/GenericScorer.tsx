@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -155,7 +155,7 @@ export function GenericScorer({ match, nameOf, onStatusChange }: Props) {
           <View style={styles.addRow}>
             <View style={styles.addInput}>
               <TextField
-                keyboardType="numbers-and-punctuation"
+                keyboardType={Platform.OS === 'ios' ? 'numbers-and-punctuation' : 'numeric'}
                 label="Puntos"
                 onChangeText={(text) =>
                   setDrafts((current) => ({ ...current, [personId]: text }))

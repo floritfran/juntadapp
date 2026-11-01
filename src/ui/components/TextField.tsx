@@ -21,7 +21,7 @@ export function TextField({
   onChangeText,
   placeholder,
   error,
-  keyboardType,
+  keyboardType = 'default',
   autoCapitalize,
   returnKeyType,
   onSubmitEditing,
