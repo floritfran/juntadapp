@@ -290,6 +290,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - Searchable lists: `SearchField` + `matchesQuery` + local `query` state + `EmptyState` when filtered empty.
 - Sharing text: pure builder in domain + `Share.share()` in the screen (never build strings in UI).
 - Money: parse inputs to integer with `parseMoneyInput` (Money.ts), display with `formatMoneyInt`; never float arithmetic.
+- Numeric inputs: `TextField` with an explicit numeric `keyboardType` (`number-pad` for non-negative values; iOS `numbers-and-punctuation` / Android `numeric` when signed values are allowed). Text inputs keep the default letters keyboard.
 
 ## Important Design Decisions
 
