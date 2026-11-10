@@ -24,8 +24,8 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Juntadas list with date, participants and total spent
 - Light/dark theme that follows the device color scheme
 - SQLite persistence with migrations
-- Casual games section (Juegos tab): start any game without a juntada using saved people or creating a new person on the spot; finish it like in a juntada and delete it with the trash icon when you no longer need it
-- Games started from a juntada only offer that juntada's participants as players
+- Casual games section (Juegos tab): start any game without a juntada using saved people or creating a new person on the spot (names are unique); finish it like in a juntada and delete it with the trash icon when you no longer need it
+- Games started from a juntada only offer that juntada's active participants as players; deleted people disappear from every player picker
 - Games module (per juntada, multiple matches per game, live scorer + stored history):
   - Truco: team score to 30 (15 malas + 15 buenas), 1v1/2v2/3v3 with team assignment, one form with a points input per team per hand, undo last hand
   - Generala: one play per player (the turn passes to the next player after each entry), standard Argentine sheet (upper bonus 35 at 63+, fixed lower values), tachar any box, editable entries

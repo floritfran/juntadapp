@@ -45,7 +45,8 @@ State of each feature and the exact files that implement it. Start here to know 
 ### 1. People and groups (complete)
 
 - CRUD: create, list, edit (inline), soft delete. People are never hard-deleted (history).
-- Domain: `src/domain/people/person-types.ts`, `src/domain/groups/group-types.ts` (types only; rules live in repositories).
+- Active person names are unique (case- and accent-insensitive, trimmed). Creating or renaming to an existing active name is blocked in `grupos.tsx`, juntada creation and the casual game form. A soft-deleted person does not block reusing their name.
+- Domain: `src/domain/people/person-types.ts`, `src/domain/people/person-name.ts` (`findPersonWithName` uniqueness helper), `src/domain/groups/group-types.ts`.
 - Repos (`src/infrastructure/persistence`):
   - `people-repository.ts`: `createPerson`, `listPeople` (excludes soft-deleted; the options shown in pickers), `listAllPeople` (INCLUDES deleted; used only to display names of historical match players), `updatePerson`, `deletePerson` (soft).
   - `groups-repository.ts`: `createGroup` (group + members in a transaction), `listGroups` (with member names), `updateGroup` (rewrites `group_members` delete+reinsert with `position`; members soft-deleted in the people table are NOT shown as options but ARE kept in the group), `deleteGroup` (soft).
@@ -93,7 +94,7 @@ State of each feature and the exact files that implement it. Start here to know 
 
 - A separate "Juegos" tab for casual scorekeeping: no juntada required. Behavior matches juntada games: a match is finished from the scorer and stays listed until the user deletes it with the trash icon (hard delete).
 - All existing games are supported (Truco, Generala, Skull King, FIFA, Generic).
-- Player picker behavior differs by flow: from a juntada it lists ONLY that juntada's participants (and hides "Cargar desde un grupo"); the casual flow lists all people, keeps groups, and allows creating a new person inline (auto-selected after creation).
+- Player picker behavior differs by flow: from a juntada it lists ONLY that juntada's active participants (soft-deleted people are dropped from the pre-selection, and "Cargar desde un grupo" is hidden); the casual flow lists all active people, keeps groups, and allows creating a new person inline (auto-selected after creation, duplicate names rejected).
 - Implementation: a hidden get-together row (`CASUAL_GET_TOGETHER_ID = 'casual'`, migration v8) backs the matches so the existing repositories/scorers are reused unchanged. `listGetTogethers` excludes it.
 - UI:
   - `src/app/(tabs)/juegos.tsx` — tab listing casual matches via `GamesSection casual`.
@@ -224,7 +225,10 @@ v8 (casual games):
 - Money stored as integer ARS (no cents)
 - Equal split: remainder distributed to the first participants (index 0..r-1)
 - Soft delete for people, groups, expenses and settlements (preserve history); games hard-delete
+- Soft-deleted people never appear as selectable players (pickers use `listPeople`); `listAllPeople` is only for rendering historical match names
+- Active person names are unique, compared with `findPersonWithName` (trim + `normalizeForSearch`)
 - Editing a group rewrites `group_members` (delete + reinsert with `position`) inside a transaction; soft-deleted members are kept in the group but not offered as options
+- Applying a group chip (new juntada or casual match) only selects its active members; soft-deleted members are ignored
 - Settlements (registered payments) count as paid for the payer and owed by the receiver, so they cancel pending transfers
 - Participants snapshot per juntada (history does not break if people change)
 - Editing or closing a juntada: NOT implemented yet (open product decision)

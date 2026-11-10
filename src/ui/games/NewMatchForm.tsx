@@ -12,8 +12,9 @@ import { createFifaTournament } from '@/infrastructure/persistence/fifa-reposito
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
 import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { createMatch } from '@/infrastructure/persistence/matches-repository';
-import { createPerson, listAllPeople } from '@/infrastructure/persistence/people-repository';
+import { createPerson, listPeople } from '@/infrastructure/persistence/people-repository';
 import { Person } from '@/domain/people/person-types';
+import { findPersonWithName } from '@/domain/people/person-name';
 import { Button } from '@/ui/components/Button';
 import { CheckRow } from '@/ui/components/CheckRow';
 import { Chip } from '@/ui/components/Chip';
@@ -79,18 +80,22 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
     [visiblePeople, personQuery]
   );
 
+  const activePersonIds = useMemo(() => new Set(people.map((person) => person.id)), [people]);
+
   const load = useCallback(async () => {
     const [peopleResult, groupsResult, getTogether] = await Promise.all([
-      listAllPeople(db),
+      listPeople(db),
       listGroups(db),
       prefillFromGetTogetherId ? getGetTogether(db, prefillFromGetTogetherId) : Promise.resolve(null),
     ]);
     setPeople(peopleResult);
     setGroups(groupsResult);
     if (getTogether) {
-      setParticipantIds(getTogether.participantIds);
-      setSelectedIds(getTogether.participantIds);
-      setTeamByPerson(defaultTeams(getTogether.participantIds, 2));
+      const activeIds = new Set(peopleResult.map((person) => person.id));
+      const participants = getTogether.participantIds.filter((personId) => activeIds.has(personId));
+      setParticipantIds(participants);
+      setSelectedIds(participants);
+      setTeamByPerson(defaultTeams(participants, 2));
     }
     setReady(true);
   }, [db, prefillFromGetTogetherId]);
@@ -121,7 +126,7 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
       applySelection([]);
     } else {
       setSelectedGroupId(group.id);
-      applySelection(group.memberIds);
+      applySelection(group.memberIds.filter((personId) => activePersonIds.has(personId)));
     }
   };
 
@@ -138,13 +143,19 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
   };
 
   const addPerson = async () => {
+    if (creatingPerson) return;
     const name = newPersonName.trim();
     if (!name) return;
+    const duplicate = findPersonWithName(people, name);
+    if (duplicate) {
+      Alert.alert('Persona duplicada', `Ya existe "${duplicate.name}".`);
+      return;
+    }
     setCreatingPerson(true);
     try {
       const person = await createPerson(db, name);
       setNewPersonName('');
-      setPeople(await listAllPeople(db));
+      setPeople(await listPeople(db));
       applySelection([...selectedIds, person.id]);
     } catch {
       Alert.alert('Error', 'No se pudo agregar la persona.');
@@ -314,7 +325,9 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
               {groups.map((group) => (
                 <Chip
                   key={group.id}
-                  label={`${group.name} (${group.members.length})`}
+                  label={`${group.name} (${
+                    group.memberIds.filter((personId) => activePersonIds.has(personId)).length
+                  })`}
                   onPress={() => applyGroup(group)}
                   selected={selectedGroupId === group.id}
                 />

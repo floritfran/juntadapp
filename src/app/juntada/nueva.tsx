@@ -5,6 +5,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 import dayjs from 'dayjs';
 
 import { matchesQuery } from '@/domain/common/text-search';
+import { findPersonWithName } from '@/domain/people/person-name';
 import { Person } from '@/domain/people/person-types';
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
 import { createGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
@@ -32,6 +33,7 @@ export default function NuevaJuntadaScreen() {
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [showNewPerson, setShowNewPerson] = useState(false);
   const [newPersonName, setNewPersonName] = useState('');
+  const [savingPerson, setSavingPerson] = useState(false);
   const [saving, setSaving] = useState(false);
   const [personQuery, setPersonQuery] = useState('');
 
@@ -39,6 +41,8 @@ export default function NuevaJuntadaScreen() {
     () => people.filter((person) => matchesQuery(person.name, personQuery)),
     [people, personQuery]
   );
+
+  const activePersonIds = useMemo(() => new Set(people.map((person) => person.id)), [people]);
 
   const load = useCallback(async () => {
     const [peopleResult, groupsResult] = await Promise.all([listPeople(db), listGroups(db)]);
@@ -66,13 +70,20 @@ export default function NuevaJuntadaScreen() {
       setSelectedIds([]);
     } else {
       setSelectedGroupId(group.id);
-      setSelectedIds(group.memberIds);
+      setSelectedIds(group.memberIds.filter((personId) => activePersonIds.has(personId)));
     }
   };
 
   const addPerson = async () => {
+    if (savingPerson) return;
     const trimmed = newPersonName.trim();
     if (!trimmed) return;
+    const duplicate = findPersonWithName(people, trimmed);
+    if (duplicate) {
+      Alert.alert('Persona duplicada', `Ya existe "${duplicate.name}".`);
+      return;
+    }
+    setSavingPerson(true);
     try {
       const person = await createPerson(db, trimmed);
       await load();
@@ -82,6 +93,8 @@ export default function NuevaJuntadaScreen() {
       setShowNewPerson(false);
     } catch {
       Alert.alert('Error', 'No se pudo crear la persona.');
+    } finally {
+      setSavingPerson(false);
     }
   };
 
@@ -141,7 +154,9 @@ export default function NuevaJuntadaScreen() {
               {groups.map((group) => (
                 <Chip
                   key={group.id}
-                  label={`${group.name} (${group.members.length})`}
+                  label={`${group.name} (${
+                    group.memberIds.filter((personId) => activePersonIds.has(personId)).length
+                  })`}
                   onPress={() => applyGroup(group)}
                   selected={selectedGroupId === group.id}
                 />
@@ -196,7 +211,8 @@ export default function NuevaJuntadaScreen() {
                 />
                 <View style={styles.newPersonActions}>
                   <Button
-                    disabled={!newPersonName.trim()}
+                    disabled={!newPersonName.trim() || savingPerson}
+                    loading={savingPerson}
                     onPress={addPerson}
                     style={styles.flex}
                     title="Agregar"
