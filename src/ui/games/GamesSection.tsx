@@ -24,6 +24,7 @@ import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
   getTogetherId: string;
+  casual?: boolean;
 }
 
 interface MatchCardData {
@@ -35,7 +36,7 @@ function teamLabel(team: TrucoTeam): string {
   return team === 1 ? 'Equipo A' : 'Equipo B';
 }
 
-export function GamesSection({ getTogetherId }: Props) {
+export function GamesSection({ getTogetherId, casual = false }: Props) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
@@ -87,7 +88,11 @@ export function GamesSection({ getTogetherId }: Props) {
     <View>
       <View style={styles.header}>
         <Button
-          onPress={() => router.push({ pathname: '/juntada/juego-nuevo', params: { id: getTogetherId } })}
+          onPress={() =>
+            casual
+              ? router.push('/juegos/nueva')
+              : router.push({ pathname: '/juntada/juego-nuevo', params: { id: getTogetherId } })
+          }
           style={styles.newButton}
           title="+ Nueva partida"
           variant="secondary"

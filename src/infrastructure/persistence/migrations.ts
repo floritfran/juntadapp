@@ -2,6 +2,10 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 
 export const DATABASE_NAME = 'juntadapp.db';
 
+// Hidden get-together used to attach casual matches (the "Juegos" tab).
+// It is excluded from the juntadas list and its matches are discarded on demand.
+export const CASUAL_GET_TOGETHER_ID = 'casual';
+
 interface Migration {
   version: number;
   sql: string;
@@ -194,6 +198,13 @@ CREATE INDEX idx_fifa_games_match ON fifa_games(match_id);
     version: 7,
     sql: `
 ALTER TABLE fifa_tournaments ADD COLUMN matches_per_opponent INTEGER;
+`,
+  },
+  {
+    version: 8,
+    sql: `
+INSERT OR IGNORE INTO get_togethers (id, name, date, status, closed_at, created_at, updated_at)
+VALUES ('${CASUAL_GET_TOGETHER_ID}', 'Casual', 0, 'closed', NULL, 0, 0);
 `,
   },
 ];

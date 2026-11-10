@@ -25,6 +25,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="juegos"
+        options={{
+          title: 'Juegos',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons color={color} name="game-controller-outline" size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="grupos"
         options={{
           title: 'Grupos',

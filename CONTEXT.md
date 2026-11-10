@@ -89,6 +89,17 @@ State of each feature and the exact files that implement it. Start here to know 
 - Rules live ONLY in domain; screens never compute scores (see Supported Games for the actual rules).
 - Match players/teams cannot be edited after creation (delete + re-create).
 
+### 5b. Casual games / scorekeeper (complete)
+
+- A separate "Juegos" tab for casual scorekeeping: no juntada required. Behavior matches juntada games: a match is finished from the scorer and stays listed until the user deletes it with the trash icon (hard delete).
+- All existing games are supported (Truco, Generala, Skull King, FIFA, Generic) and players are picked from the existing people/groups.
+- Implementation: a hidden get-together row (`CASUAL_GET_TOGETHER_ID = 'casual'`, migration v8) backs the matches so the existing repositories/scorers are reused unchanged. `listGetTogethers` excludes it.
+- UI:
+  - `src/app/(tabs)/juegos.tsx` — tab listing casual matches via `GamesSection casual`.
+  - `src/app/juegos/nueva.tsx` — create casual match (`NewMatchForm` with `targetGetTogetherId = CASUAL_GET_TOGETHER_ID`).
+  - `src/ui/games/NewMatchForm.tsx` — reusable game/players setup extracted from `juntada/juego-nuevo.tsx` (used by both flows).
+- `GamesSection` takes `casual?: boolean` only to route its new-match button to `/juegos/nueva`; finishing and deleting work exactly like in a juntada (scorer finish + trash icon).
+
 ### 6. Search pattern (reusable)
 
 - `src/ui/components/SearchField.tsx` wraps `TextField` with `icon="search"` + `autoCapitalize="none"` and an X button (`close-circle`) that clears the query when the field has text.
@@ -118,8 +129,9 @@ State of each feature and the exact files that implement it. Start here to know 
 
 ```
 src/app            - Expo Router screens (every file is a route)
-  /(tabs)/         - index (juntadas), grupos (people+groups), _layout
+  /(tabs)/         - index (juntadas), juegos (casual scorekeeper), grupos (people+groups), _layout
   /juntada/        - nueva, [id], gasto-nuevo, gasto-editar, pago-nuevo, juego-nuevo, partida
+  /juegos/         - nueva (casual match setup, modal)
 src/app/AppRoot.tsx - EMPTY vestigial file, not mounted anywhere (safe to ignore/remove)
 src/domain         - pure business logic
   /common/         - Money.ts (formatMoneyInt), text-search.ts (normalizeForSearch/matchesQuery)
@@ -155,7 +167,7 @@ CONTEXT.md         - this file; README.md - developer overview; diseño.md - ori
 - Match (id, getTogetherId, game truco|generala|skull-king|fifa|generic, status active|finished, teamSize for truco, players snapshot with team, timestamps)
 - Game-specific: TrucoRound (team1Points, team2Points), GeneralaEntry (box, points, tachado), SkullKingRoundEntry (round, bid, tricks, bonus), FifaGame (round, slot, players, scores, penalty winner), GenericAdjustment (personId, points)
 
-## Data Model (SQLite, migrations v1–v7)
+## Data Model (SQLite, migrations v1–v8)
 
 Timestamps are INTEGER epoch milliseconds. Soft deletes via `deleted_at` for money/people data; games are hard-deleted (cascade).
 
@@ -200,6 +212,10 @@ v7 (FIFA matches per opponent):
 
 - fifa_tournaments.matches_per_opponent INTEGER NULL — `NULL` means infinite league (previous behavior); a positive integer means that many full round-robin cycles before the league auto-finishes
 
+v8 (casual games):
+
+- inserts a hidden `get_togethers` row with id `casual` (`CASUAL_GET_TOGETHER_ID`) used only to attach casual matches; `listGetTogethers` filters it out. No schema changes
+
 `position` preserves participant order (it decides who absorbs the split remainder).
 
 ## Main Business Rules
@@ -211,6 +227,7 @@ v7 (FIFA matches per opponent):
 - Settlements (registered payments) count as paid for the payer and owed by the receiver, so they cancel pending transfers
 - Participants snapshot per juntada (history does not break if people change)
 - Editing or closing a juntada: NOT implemented yet (open product decision)
+- Casual matches belong to the hidden `casual` get-together; they finish and delete like any other match (no special discard flow)
 
 ## Expense Calculation
 
@@ -249,9 +266,11 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 ```
 (tabs)
 ├── index   - Juntadas (list + create button)
+├── juegos  - Casual scorekeeper (in-progress matches + new match)
 └── grupos  - Personas y grupos
 Stack (root)
 ├── juntada/nueva        - create juntada (modal)
+├── juegos/nueva         - create casual match (modal, hidden casual get-together)
 ├── juntada/gasto-nuevo  - add expense (modal, ?id= getTogether)
 ├── juntada/gasto-editar - edit expense (modal, ?id=, ?expenseId=)
 ├── juntada/pago-nuevo   - register a debt payment (modal, ?id=, optional ?fromId= ?toId= ?amount=)
@@ -283,7 +302,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 
 ## Patterns (follow when adding features)
 
-- Reusable forms: extract to `src/ui/<area>/` and receive props (see `ExpenseForm`/`SettlementForm`); screens own loading/saving.
+- Reusable forms: extract to `src/ui/<area>/` and receive props (see `ExpenseForm`/`SettlementForm`/`NewMatchForm`); screens own loading/saving.
 - Edit flows: modal route for editing money records (`gasto-editar`); inline edit state inside the list screen for lightweight entities (people/groups in `grupos.tsx`).
 - Destructive actions: always `Alert.alert` confirmation.
 - Reload after mutation: call the local `load()` at the end of the mutation (no cache invalidation layer).
@@ -363,7 +382,8 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - `diseño.md` - original product requirements (Spanish)
 - `src/domain/expenses/expense-calculator.ts` - splits, balances, transfers
 - `src/domain/common/text-search.ts` - search normalization + matchesQuery
-- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v7
+- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v8 + `CASUAL_GET_TOGETHER_ID`
+- `src/ui/games/NewMatchForm.tsx` - reusable match setup (juntada + casual flows)
 - `src/app/_layout.tsx` - root layout (SQLiteProvider + ThemeProvider + Stack)
 - `src/app/juntada/[id].tsx` - juntada detail (Liquidación + Gastos | Juegos)
 - `src/ui/theme.tsx` - palettes, spacing scale, ThemeProvider + useColors
@@ -376,6 +396,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - SQLite schema/migrations v1–v5 + all repositories
 - Full UI: juntadas list/create/detail, expenses create/edit/delete, payments, people/groups with inline edit, search everywhere
 - Games module: Truco, Generala, Skull King, FIFA (Liga infinita / Copa), Generic (domain + tests + repositories + scorers + match list)
+- Casual games tab: play any game without a juntada; finish like juntadas and delete with the trash icon
 - Light/dark theme follows the device color scheme
 - All checks green: `npm test` (101 tests), `npm run lint`, `npm run typecheck`
 
