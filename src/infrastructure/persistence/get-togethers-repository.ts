@@ -8,6 +8,7 @@ import {
 } from '../../domain/get-togethers/get-together-types';
 import { PersonId } from '../../domain/people/person-types';
 import { newId } from '../id';
+import { CASUAL_GET_TOGETHER_ID } from './migrations';
 
 export interface GetTogetherSummary extends GetTogether {
   totalSpent: MoneyInt;
@@ -63,7 +64,9 @@ export async function listGetTogethers(db: SQLiteDatabase): Promise<GetTogetherS
             COALESCE((SELECT SUM(e.amount_int) FROM expenses e
                        WHERE e.get_together_id = gt.id AND e.deleted_at IS NULL), 0) AS total_spent
        FROM get_togethers gt
-      ORDER BY gt.date DESC, gt.created_at DESC`
+      WHERE gt.id <> ?
+      ORDER BY gt.date DESC, gt.created_at DESC`,
+    CASUAL_GET_TOGETHER_ID
   );
   const participants = await getParticipantIdsByGetTogether(db);
   return rows.map((row) => ({

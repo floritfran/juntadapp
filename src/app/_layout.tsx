@@ -37,6 +37,7 @@ function RootNavigator() {
         <Stack.Screen name="juntada/gasto-editar" options={{ title: 'Editar gasto', presentation: 'modal' }} />
         <Stack.Screen name="juntada/pago-nuevo" options={{ title: 'Saldar deuda', presentation: 'modal' }} />
         <Stack.Screen name="juntada/juego-nuevo" options={{ title: 'Nueva partida', presentation: 'modal' }} />
+        <Stack.Screen name="juegos/nueva" options={{ title: 'Nueva partida', presentation: 'modal' }} />
         <Stack.Screen name="juntada/partida" options={{ title: 'Partida' }} />
         <Stack.Screen name="juntada/[id]" options={{ title: 'Juntada' }} />
       </Stack>
