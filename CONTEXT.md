@@ -92,12 +92,13 @@ State of each feature and the exact files that implement it. Start here to know 
 ### 5b. Casual games / scorekeeper (complete)
 
 - A separate "Juegos" tab for casual scorekeeping: no juntada required. Behavior matches juntada games: a match is finished from the scorer and stays listed until the user deletes it with the trash icon (hard delete).
-- All existing games are supported (Truco, Generala, Skull King, FIFA, Generic) and players are picked from the existing people/groups.
+- All existing games are supported (Truco, Generala, Skull King, FIFA, Generic).
+- Player picker behavior differs by flow: from a juntada it lists ONLY that juntada's participants (and hides "Cargar desde un grupo"); the casual flow lists all people, keeps groups, and allows creating a new person inline (auto-selected after creation).
 - Implementation: a hidden get-together row (`CASUAL_GET_TOGETHER_ID = 'casual'`, migration v8) backs the matches so the existing repositories/scorers are reused unchanged. `listGetTogethers` excludes it.
 - UI:
   - `src/app/(tabs)/juegos.tsx` — tab listing casual matches via `GamesSection casual`.
   - `src/app/juegos/nueva.tsx` — create casual match (`NewMatchForm` with `targetGetTogetherId = CASUAL_GET_TOGETHER_ID`).
-  - `src/ui/games/NewMatchForm.tsx` — reusable game/players setup extracted from `juntada/juego-nuevo.tsx` (used by both flows).
+  - `src/ui/games/NewMatchForm.tsx` — reusable game/players setup extracted from `juntada/juego-nuevo.tsx` (used by both flows). `prefillFromGetTogetherId` marks the juntada flow: participants are pre-selected, the list is filtered to them, and the group chips are hidden. Without it (casual) it shows all people plus an inline "Nueva persona" field.
 - `GamesSection` takes `casual?: boolean` only to route its new-match button to `/juegos/nueva`; finishing and deleting work exactly like in a juntada (scorer finish + trash icon).
 
 ### 6. Search pattern (reusable)

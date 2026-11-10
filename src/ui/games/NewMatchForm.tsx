@@ -12,7 +12,7 @@ import { createFifaTournament } from '@/infrastructure/persistence/fifa-reposito
 import { GroupWithMembers, listGroups } from '@/infrastructure/persistence/groups-repository';
 import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { createMatch } from '@/infrastructure/persistence/matches-repository';
-import { listAllPeople } from '@/infrastructure/persistence/people-repository';
+import { createPerson, listAllPeople } from '@/infrastructure/persistence/people-repository';
 import { Person } from '@/domain/people/person-types';
 import { Button } from '@/ui/components/Button';
 import { CheckRow } from '@/ui/components/CheckRow';
@@ -21,6 +21,7 @@ import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { SearchField } from '@/ui/components/SearchField';
 import { SectionTitle } from '@/ui/components/SectionTitle';
+import { TextField } from '@/ui/components/TextField';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 const GAMES: GameId[] = ['truco', 'generala', 'skull-king', 'fifa', 'generic'];
@@ -59,10 +60,23 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
   const [teamByPerson, setTeamByPerson] = useState<Record<string, TrucoTeam>>({});
   const [saving, setSaving] = useState(false);
   const [personQuery, setPersonQuery] = useState('');
+  const [participantIds, setParticipantIds] = useState<string[] | null>(null);
+  const [newPersonName, setNewPersonName] = useState('');
+  const [creatingPerson, setCreatingPerson] = useState(false);
+
+  const isJuntada = Boolean(prefillFromGetTogetherId);
+
+  const visiblePeople = useMemo(() => {
+    if (!isJuntada) return people;
+    const byId = new Map(people.map((person) => [person.id, person] as const));
+    return (participantIds ?? [])
+      .map((personId) => byId.get(personId))
+      .filter((person): person is Person => person != null);
+  }, [isJuntada, people, participantIds]);
 
   const filteredPeople = useMemo(
-    () => people.filter((person) => matchesQuery(person.name, personQuery)),
-    [people, personQuery]
+    () => visiblePeople.filter((person) => matchesQuery(person.name, personQuery)),
+    [visiblePeople, personQuery]
   );
 
   const load = useCallback(async () => {
@@ -74,6 +88,7 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
     setPeople(peopleResult);
     setGroups(groupsResult);
     if (getTogether) {
+      setParticipantIds(getTogether.participantIds);
       setSelectedIds(getTogether.participantIds);
       setTeamByPerson(defaultTeams(getTogether.participantIds, 2));
     }
@@ -120,6 +135,22 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
       ...current,
       [personId]: current[personId] === 1 ? 2 : 1,
     }));
+  };
+
+  const addPerson = async () => {
+    const name = newPersonName.trim();
+    if (!name) return;
+    setCreatingPerson(true);
+    try {
+      const person = await createPerson(db, name);
+      setNewPersonName('');
+      setPeople(await listAllPeople(db));
+      applySelection([...selectedIds, person.id]);
+    } catch {
+      Alert.alert('Error', 'No se pudo agregar la persona.');
+    } finally {
+      setCreatingPerson(false);
+    }
   };
 
   const team1Count = selectedIds.filter((personId) => teamByPerson[personId] === 1).length;
@@ -276,7 +307,7 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
           </>
         ) : null}
 
-        {groups.length > 0 ? (
+        {!isJuntada && groups.length > 0 ? (
           <>
             <SectionTitle style={styles.section} title="Cargar desde un grupo" />
             <View style={styles.chipsRow}>
@@ -293,19 +324,39 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
         ) : null}
 
         <SectionTitle style={styles.section} title="Jugadores" />
-        {people.length === 0 ? (
+        {!isJuntada ? (
+          <View style={styles.createPersonRow}>
+            <View style={styles.flex}>
+              <TextField
+                autoCapitalize="words"
+                label="Nueva persona"
+                onChangeText={setNewPersonName}
+                onSubmitEditing={addPerson}
+                placeholder="Nombre"
+                returnKeyType="done"
+                value={newPersonName}
+              />
+            </View>
+            <Button
+              disabled={!newPersonName.trim()}
+              loading={creatingPerson}
+              onPress={addPerson}
+              style={styles.createPersonButton}
+              title="Agregar"
+            />
+          </View>
+        ) : null}
+
+        {visiblePeople.length === 0 ? (
           <EmptyState
             icon="person-outline"
-            message="Necesitás cargar personas antes de empezar una partida."
-            title="Sin personas"
-          >
-            <Button
-              onPress={() => router.push('/grupos')}
-              style={styles.emptyButton}
-              title="Ir a Grupos"
-              variant="secondary"
-            />
-          </EmptyState>
+            message={
+              isJuntada
+                ? 'Esta juntada no tiene participantes cargados.'
+                : 'Cargá personas para empezar una partida.'
+            }
+            title={isJuntada ? 'Sin participantes' : 'Sin personas'}
+          />
         ) : (
           <>
             <SearchField onChangeText={setPersonQuery} value={personQuery} />
@@ -400,8 +451,13 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
     fontSize: fontSize.md,
     marginRight: spacing.sm,
   },
-  emptyButton: {
-    marginTop: spacing.lg,
+  createPersonRow: {
+    alignItems: 'flex-end',
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  createPersonButton: {
+    marginBottom: spacing.lg,
   },
   footer: {
     backgroundColor: colors.bg,
