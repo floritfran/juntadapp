@@ -18,11 +18,14 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Record expenses: payer, amount, participants
 - Edit an existing expense; settlements and totals recompute automatically
 - Settle a debt: register a payment between two people that cancels the pending transfer
+- Settle every pending transfer at once with a single confirmation ("Saldar todo")
 - Equal split with deterministic integer remainder
 - Settlement: direct payments or debt minimization (default)
 - Share the settlement summary (total + pending transfers) as plain text to WhatsApp or any app
 - Juntadas list with date, participants and total spent
 - Light/dark theme that follows the device color scheme
+- Haptic feedback on game actions (score, undo, finish) and other confirmations
+- Long lists and player pickers are virtualized (`FlatList`/`SectionList`) for smooth scrolling
 - SQLite persistence with migrations
 - Casual games section (Juegos tab): start any game without a juntada using saved people or creating a new person on the spot (names are unique); finish it like in a juntada and delete it with the trash icon when you no longer need it
 - Games started from a juntada only offer that juntada's active participants as players; deleted people disappear from every player picker
@@ -30,7 +33,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
   - Truco: team score to 30 (15 malas + 15 buenas), 1v1/2v2/3v3 with team assignment, one form with a points input per team per hand, undo last hand
   - Generala: one play per player (the turn passes to the next player after each entry), standard Argentine sheet (upper bonus 35 at 63+, fixed lower values), tachar any box, editable entries
   - Skull King: 10 rounds of one card per player each (round N deals N cards), bid + tricks per player, automatic scoring (exact bid 0 = 10 x round, exact bid N = 20 x N, miss = -10 per unit, missed 0 bid = -10 x round), combat bonus presets and free +/- bonuses, round history with undo
-  - FIFA: 1v1 tournament with manually entered goals, in Liga (round-robin with standings and automatic next fecha; configurable matches per opponent, infinite by default) or Copa (single elimination with byes, penalty winners for ties and automatic champion)
+  - FIFA: 1v1 tournament with manually entered goals, in Liga (round-robin with standings and automatic next fecha; configurable matches per opponent, infinite by default) or Copa (single elimination with byes, penalty winners for ties and automatic champion), with undo last match (clears cup advancement when the next round is still pending)
 
 ## Download (APK)
 
@@ -38,7 +41,7 @@ Latest Android build: [Google Drive folder](https://drive.google.com/drive/folde
 
 ## Requirements
 
-- Node 20+, npm
+- Node 22+, npm (migration tests use `node:sqlite`)
 - Expo Go (iOS/Android) or an emulator
 
 ## Install and run
@@ -56,7 +59,7 @@ npm run ios
 | ----------------------- | ------------------------------- |
 | `npm start`             | Start the Expo dev server       |
 | `npm run android`/`ios` | Run on Android/iOS              |
-| `npm test`              | Domain unit tests               |
+| `npm test`              | Unit tests (domain + migrations) |
 | `npm run typecheck`     | TypeScript check (`--noEmit`)   |
 | `npm run lint`          | ESLint over the whole project   |
 
@@ -70,6 +73,7 @@ src/domain         - pure business logic, unit tested, no RN/Expo imports
 src/infrastructure - SQLite migrations + repositories, id generator
 src/ui             - theme, formatters, shared components
 tests/domain       - domain unit tests
+tests/infrastructure - SQLite migration tests (node:sqlite, in-memory)
 ```
 
 Architecture: `UI (src/app) -> repositories (src/infrastructure/persistence) -> domain (src/domain)`.

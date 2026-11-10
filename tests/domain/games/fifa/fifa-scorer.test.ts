@@ -4,11 +4,13 @@ import {
   cupChampion,
   fifaGameWinner,
   isLeagueComplete,
+  lastPlayedGame,
   leagueRoundPlan,
   leagueStandings,
   leagueTotalRounds,
   nextLeagueRoundIndex,
   nextPlayableGame,
+  planCupUndo,
   validateFifaResult,
   validateFifaScore,
   validateFifaScores,
@@ -363,5 +365,107 @@ describe('fifa - copa', () => {
       penaltyWinnerId: 'b',
     });
     expect(fifaGameWinner(played)).toBe('b');
+  });
+});
+
+describe('fifa - deshacer último partido', () => {
+  test('sin partidos jugados no hay nada para deshacer', () => {
+    expect(lastPlayedGame([])).toBeNull();
+    expect(lastPlayedGame(toGames(cupBracketPlan(['a', 'b'])))).toBeNull();
+  });
+
+  test('devuelve el partido jugado más recientemente', () => {
+    const early = game('g0', { round: 0, slot: 0, player1Id: 'a', player2Id: 'b' }, {
+      score1: 1,
+      score2: 0,
+    });
+    const late: FifaGame = {
+      ...game('g1', { round: 0, slot: 1, player1Id: 'c', player2Id: 'd' }, {
+        score1: 2,
+        score2: 2,
+        penaltyWinnerId: 'd',
+      }),
+      playedAt: new Date(1000),
+    };
+    expect(lastPlayedGame([early, late])?.id).toBe('g1');
+    expect(lastPlayedGame([late, early])?.id).toBe('g1');
+  });
+
+  test('desempata por ronda y slot cuando la fecha es la misma', () => {
+    const first = game('g0', { round: 0, slot: 0, player1Id: 'a', player2Id: 'b' }, {
+      score1: 1,
+      score2: 0,
+    });
+    const second = game('g1', { round: 0, slot: 1, player1Id: 'c', player2Id: 'd' }, {
+      score1: 1,
+      score2: 0,
+    });
+    expect(lastPlayedGame([first, second])?.id).toBe('g1');
+  });
+
+  test('al deshacer una semifinal libera el lugar del ganador en la final', () => {
+    const games = toGames(cupBracketPlan(['a', 'b', 'c', 'd']));
+    const semi = games.find((item) => item.round === 0 && item.slot === 0)!;
+    const afterSemi = applyCupResult(games, semi.id, { score1: 2, score2: 1 });
+    expect(planCupUndo(afterSemi.games, semi.id)).toEqual({
+      gameId: semi.id,
+      clearAdvance: { round: 1, slot: 0, position: 1 },
+    });
+
+    const otherSemi = afterSemi.games.find(
+      (item) => item.round === 0 && item.slot === 1
+    )!;
+    const afterOther = applyCupResult(afterSemi.games, otherSemi.id, {
+      score1: 0,
+      score2: 1,
+    });
+    expect(planCupUndo(afterOther.games, otherSemi.id)).toEqual({
+      gameId: otherSemi.id,
+      clearAdvance: { round: 1, slot: 0, position: 2 },
+    });
+  });
+
+  test('deshacer la final no tiene avance que limpiar', () => {
+    const games = toGames(cupBracketPlan(['a', 'b']));
+    const afterFinal = applyCupResult(games, games[0].id, { score1: 1, score2: 0 });
+    expect(planCupUndo(afterFinal.games, games[0].id)).toEqual({
+      gameId: games[0].id,
+      clearAdvance: null,
+    });
+  });
+
+  test('no limpia el avance si el ganador ya no está en la siguiente llave', () => {
+    const games = toGames(cupBracketPlan(['a', 'b', 'c', 'd']));
+    const semi = games.find((item) => item.round === 0 && item.slot === 0)!;
+    const afterSemi = applyCupResult(games, semi.id, { score1: 2, score2: 1 });
+    const altered = afterSemi.games.map((item) =>
+      item.round === 1 ? { ...item, player1Id: 'x' } : item
+    );
+    expect(planCupUndo(altered, semi.id)).toEqual({
+      gameId: semi.id,
+      clearAdvance: null,
+    });
+  });
+
+  test('no permite deshacer un partido sin resultado', () => {
+    const games = toGames(cupBracketPlan(['a', 'b']));
+    expect(() => planCupUndo(games, games[0].id)).toThrow();
+  });
+
+  test('no permite deshacer si la ronda siguiente ya se jugó', () => {
+    const games = toGames(cupBracketPlan(['a', 'b', 'c', 'd']));
+    const semi1 = games.find((item) => item.round === 0 && item.slot === 0)!;
+    const semi2 = games.find((item) => item.round === 0 && item.slot === 1)!;
+    const afterSemi1 = applyCupResult(games, semi1.id, { score1: 2, score2: 1 });
+    const afterSemi2 = applyCupResult(afterSemi1.games, semi2.id, {
+      score1: 0,
+      score2: 1,
+    });
+    const final = afterSemi2.games.find((item) => item.round === 1)!;
+    const afterFinal = applyCupResult(afterSemi2.games, final.id, {
+      score1: 1,
+      score2: 0,
+    });
+    expect(() => planCupUndo(afterFinal.games, semi1.id)).toThrow();
   });
 });

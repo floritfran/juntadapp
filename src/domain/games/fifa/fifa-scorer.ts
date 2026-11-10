@@ -5,6 +5,7 @@ import {
   FifaGamePlan,
   FifaResult,
   FifaStandingRow,
+  FifaUndoPlan,
 } from './fifa-types';
 
 export const FIFA_POINTS = {
@@ -123,6 +124,26 @@ export function nextPlayableGame(games: readonly FifaGame[]): FifaGame | null {
     )
     .sort((a, b) => a.round - b.round || a.slot - b.slot);
   return pending[0] ?? null;
+}
+
+export function lastPlayedGame(games: readonly FifaGame[]): FifaGame | null {
+  let latest: FifaGame | null = null;
+  for (const game of games) {
+    if (game.score1 === null || game.score2 === null) continue;
+    if (!latest) {
+      latest = game;
+      continue;
+    }
+    const gameTime = game.playedAt?.getTime() ?? 0;
+    const latestTime = latest.playedAt?.getTime() ?? 0;
+    const isLater =
+      gameTime > latestTime ||
+      (gameTime === latestTime &&
+        (game.round > latest.round ||
+          (game.round === latest.round && game.slot > latest.slot)));
+    if (isLater) latest = game;
+  }
+  return latest;
 }
 
 export function leagueStandings(
@@ -293,6 +314,36 @@ export function applyCupResult(
       : { ...nextGame, player2Id: winnerId };
 
   return { games: updated, winnerId, championId: null };
+}
+
+export function planCupUndo(
+  games: readonly FifaGame[],
+  gameId: string
+): FifaUndoPlan {
+  const target = games.find((game) => game.id === gameId);
+  if (!target) throw new Error('game not found');
+  if (target.score1 === null || target.score2 === null) {
+    throw new Error('game has no result');
+  }
+  const winnerId = fifaGameWinner(target);
+  if (!winnerId) throw new Error('game has no winner');
+
+  const nextRound = target.round + 1;
+  const nextSlot = Math.floor(target.slot / 2);
+  const position: 1 | 2 = target.slot % 2 === 0 ? 1 : 2;
+  const nextGame = games.find(
+    (game) => game.round === nextRound && game.slot === nextSlot
+  );
+  if (!nextGame) return { gameId, clearAdvance: null };
+  if (nextGame.score1 !== null || nextGame.score2 !== null) {
+    throw new Error('cannot undo a game whose next round was already played');
+  }
+  const nextPlayerId = position === 1 ? nextGame.player1Id : nextGame.player2Id;
+  if (nextPlayerId !== winnerId) return { gameId, clearAdvance: null };
+  return {
+    gameId,
+    clearAdvance: { round: nextRound, slot: nextSlot, position },
+  };
 }
 
 export function cupChampion(games: readonly FifaGame[]): PersonId | null {

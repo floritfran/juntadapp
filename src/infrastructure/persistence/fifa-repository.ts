@@ -5,6 +5,7 @@ import {
   FifaGame,
   FifaMode,
   FifaResult,
+  FifaUndoAdvance,
 } from '../../domain/games/fifa/fifa-types';
 import {
   cupBracketPlan,
@@ -174,6 +175,37 @@ export async function saveFifaResult(
         input.matchId,
         input.advance.round,
         input.advance.slot
+      );
+    }
+  });
+}
+
+export async function undoFifaResult(
+  db: SQLiteDatabase,
+  input: {
+    matchId: MatchId;
+    gameId: string;
+    clearAdvance?: FifaUndoAdvance | null;
+  }
+): Promise<void> {
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE fifa_games
+          SET score1 = NULL, score2 = NULL, penalty_winner_id = NULL, played_at = NULL
+        WHERE id = ? AND match_id = ?`,
+      input.gameId,
+      input.matchId
+    );
+
+    if (input.clearAdvance) {
+      const column = input.clearAdvance.position === 1 ? 'player1_id' : 'player2_id';
+      await db.runAsync(
+        `UPDATE fifa_games
+            SET ${column} = NULL
+          WHERE match_id = ? AND round = ? AND slot = ?`,
+        input.matchId,
+        input.clearAdvance.round,
+        input.clearAdvance.slot
       );
     }
   });

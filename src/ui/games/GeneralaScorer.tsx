@@ -25,6 +25,7 @@ import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
+import { lightHaptic, selectionHaptic, successHaptic } from '@/ui/haptics';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
@@ -37,6 +38,14 @@ interface EditingState {
   personId: PersonId;
   box: GeneralaBox;
   existing: GeneralaPlayerEntry | null;
+}
+
+function groupByPlayer(entries: GeneralaPlayerEntry[]): Record<string, GeneralaPlayerEntry[]> {
+  const map: Record<string, GeneralaPlayerEntry[]> = {};
+  entries.forEach((entry) => {
+    (map[entry.personId] ??= []).push(entry);
+  });
+  return map;
 }
 
 export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
@@ -56,6 +65,7 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
   const load = useCallback(async () => {
     const result = await listGeneralaEntries(db, match.id);
     setEntries(result);
+    return result;
   }, [db, match.id]);
 
   useFocusEffect(
@@ -64,13 +74,7 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
     }, [load])
   );
 
-  const entriesByPlayer = useMemo(() => {
-    const map: Record<string, GeneralaPlayerEntry[]> = {};
-    entries?.forEach((entry) => {
-      (map[entry.personId] ??= []).push(entry);
-    });
-    return map;
-  }, [entries]);
+  const entriesByPlayer = useMemo(() => groupByPlayer(entries ?? []), [entries]);
 
   const turn = entries === null ? null : nextGeneralaTurn(order, entriesByPlayer);
   const complete = entries !== null && turn === null;
@@ -78,7 +82,10 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
   useEffect(() => {
     if (complete && status === 'active') {
       finishMatch(db, match.id)
-        .then(() => changeStatus('finished'))
+        .then(() => {
+          changeStatus('finished');
+          successHaptic();
+        })
         .catch(() => undefined);
     }
   }, [complete, status, db, match.id, changeStatus]);
@@ -117,7 +124,10 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
         tachado: false,
       });
       setEditing(null);
-      await load();
+      const updated = await load();
+      if (nextGeneralaTurn(order, groupByPlayer(updated)) !== null) {
+        lightHaptic();
+      }
     } catch {
       Alert.alert('Error', 'No se pudo guardar el casillero.');
     }
@@ -134,7 +144,10 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
         tachado: true,
       });
       setEditing(null);
-      await load();
+      const updated = await load();
+      if (nextGeneralaTurn(order, groupByPlayer(updated)) !== null) {
+        lightHaptic();
+      }
     } catch {
       Alert.alert('Error', 'No se pudo tachar el casillero.');
     }
@@ -142,7 +155,12 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
 
   const toggleStatus = () => {
     if (status === 'finished') {
-      reopenMatch(db, match.id).then(() => changeStatus('active')).catch(() => undefined);
+      reopenMatch(db, match.id)
+        .then(() => {
+          changeStatus('active');
+          selectionHaptic();
+        })
+        .catch(() => undefined);
     } else {
       Alert.alert('Finalizar partida', '¿Cerrar la partida ahora?', [
         { text: 'Cancelar', style: 'cancel' },
@@ -151,6 +169,7 @@ export function GeneralaScorer({ match, nameOf, onStatusChange }: Props) {
           onPress: async () => {
             await finishMatch(db, match.id);
             changeStatus('finished');
+            successHaptic();
           },
         },
       ]);

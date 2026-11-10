@@ -1,6 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ReactElement, useCallback, useMemo, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -25,6 +34,9 @@ import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 interface Props {
   getTogetherId: string;
   casual?: boolean;
+  header?: ReactElement | null;
+  footer?: ReactElement | null;
+  contentContainerStyle?: StyleProp<ViewStyle>;
 }
 
 interface MatchCardData {
@@ -36,7 +48,13 @@ function teamLabel(team: TrucoTeam): string {
   return team === 1 ? 'Equipo A' : 'Equipo B';
 }
 
-export function GamesSection({ getTogetherId, casual = false }: Props) {
+export function GamesSection({
+  getTogetherId,
+  casual = false,
+  header,
+  footer,
+  contentContainerStyle,
+}: Props) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const db = useSQLiteContext();
@@ -85,61 +103,70 @@ export function GamesSection({ getTogetherId, casual = false }: Props) {
   if (cards === null) return null;
 
   return (
-    <View>
-      <View style={styles.header}>
-        <Button
-          onPress={() =>
-            casual
-              ? router.push('/juegos/nueva')
-              : router.push({ pathname: '/juntada/juego-nuevo', params: { id: getTogetherId } })
-          }
-          style={styles.newButton}
-          title="+ Nueva partida"
-          variant="secondary"
-        />
-      </View>
-
-      {cards.length === 0 ? (
+    <FlatList
+      contentContainerStyle={contentContainerStyle}
+      data={cards}
+      keyExtractor={(item) => item.match.id}
+      keyboardDismissMode="on-drag"
+      keyboardShouldPersistTaps="handled"
+      ListEmptyComponent={
         <EmptyState
           icon="game-controller-outline"
           message="Elegí Truco, Generala, Skull King, FIFA o Juego genérico y cargá los jugadores para empezar."
           title="Sin partidas todavía"
         />
-      ) : (
-        cards.map(({ match, summary }) => (
-          <Pressable
-            key={match.id}
-            onPress={() => router.push({ pathname: '/juntada/partida', params: { match: match.id } })}
-          >
-            <Card style={styles.matchCard}>
-              <View style={styles.matchRow}>
-                <View style={styles.flex}>
-                  <View style={styles.titleRow}>
-                    <Text style={styles.game}>{GAME_LABELS[match.game]}</Text>
-                    <View
-                      style={[styles.badge, match.status === 'finished' ? styles.badgeDone : styles.badgeActive]}
+      }
+      ListFooterComponent={footer}
+      ListHeaderComponent={
+        <>
+          {header}
+          <View style={styles.header}>
+            <Button
+              onPress={() =>
+                casual
+                  ? router.push('/juegos/nueva')
+                  : router.push({ pathname: '/juntada/juego-nuevo', params: { id: getTogetherId } })
+              }
+              style={styles.newButton}
+              title="+ Nueva partida"
+              variant="secondary"
+            />
+          </View>
+        </>
+      }
+      renderItem={({ item: { match, summary } }) => (
+        <Pressable
+          onPress={() => router.push({ pathname: '/juntada/partida', params: { match: match.id } })}
+        >
+          <Card style={styles.matchCard}>
+            <View style={styles.matchRow}>
+              <View style={styles.flex}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.game}>{GAME_LABELS[match.game]}</Text>
+                  <View
+                    style={[styles.badge, match.status === 'finished' ? styles.badgeDone : styles.badgeActive]}
+                  >
+                    <Text
+                      style={[styles.badgeText, match.status === 'finished' ? styles.badgeTextDone : styles.badgeTextActive]}
                     >
-                      <Text
-                        style={[styles.badgeText, match.status === 'finished' ? styles.badgeTextDone : styles.badgeTextActive]}
-                      >
-                        {match.status === 'finished' ? 'Finalizada' : 'En curso'}
-                      </Text>
-                    </View>
+                      {match.status === 'finished' ? 'Finalizada' : 'En curso'}
+                    </Text>
                   </View>
-                  <Text numberOfLines={1} style={styles.players}>
-                    {match.players.map((player) => nameOf(player.personId)).join(' · ')}
-                  </Text>
-                  <Text style={styles.summary}>{summary}</Text>
                 </View>
-                <Pressable hitSlop={8} onPress={() => confirmDelete(match)} style={styles.iconButton}>
-                  <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                </Pressable>
+                <Text numberOfLines={1} style={styles.players}>
+                  {match.players.map((player) => nameOf(player.personId)).join(' · ')}
+                </Text>
+                <Text style={styles.summary}>{summary}</Text>
               </View>
-            </Card>
-          </Pressable>
-        ))
+              <Pressable hitSlop={8} onPress={() => confirmDelete(match)} style={styles.iconButton}>
+                <Ionicons color={colors.danger} name="trash-outline" size={20} />
+              </Pressable>
+            </View>
+          </Card>
+        </Pressable>
       )}
-    </View>
+      style={styles.list}
+    />
   );
 }
 
@@ -227,6 +254,9 @@ function groupByPlayer<T extends { personId: string }>(entries: T[]): Record<str
 }
 
 const makeStyles = (colors: Colors) => StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   header: {
     marginBottom: spacing.md,
   },

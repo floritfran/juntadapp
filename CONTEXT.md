@@ -19,11 +19,11 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 
 - Expo SDK 57, React Native 0.86, TypeScript (strict)
 - Expo Router (file-based routing, typed routes enabled) - routes in `src/app`
-- expo-sqlite (`SQLiteProvider` + `onInit` migration hook), expo-crypto (UUIDs), dayjs (dates)
+- expo-sqlite (`SQLiteProvider` + `onInit` migration hook), expo-crypto (UUIDs), expo-haptics (selection/light/success feedback), dayjs (dates)
 - Jest + jest-expo (`jest.config.js`, transform via babel-preset-expo). Do NOT switch to ts-jest: it was tried and broke on React Native imports; the jest-expo preset is the working setup.
 - ESLint with `eslint-config-expo`
 - CI: GitHub Actions (`.github/workflows/tests.yml`) runs `npm run typecheck`, `npm run lint`, `npm test` on every push/PR to `master`
-- Installed but not used yet: Zustand, zod, react-hook-form (reserved for real shared state / form validation needs; do not add a store or validation lib "just in case"), expo-haptics, expo-blur
+- Installed but not used yet: Zustand, zod, react-hook-form (reserved for real shared state / form validation needs; do not add a store or validation lib "just in case"), expo-blur
 
 ## Architecture
 
@@ -61,7 +61,7 @@ State of each feature and the exact files that implement it. Start here to know 
 - UI:
   - `src/app/(tabs)/index.tsx` — list: name, date, participant count, total spent; create button opens modal.
   - `src/app/juntada/nueva.tsx` — modal: group chip to preload selection, people checkboxes with SearchField, EmptyState on no matches; selection preserved when filtering.
-  - `src/app/juntada/[id].tsx` — detail: header with balances/transfers (Liquidación section: "Saldar" per transfer opens pago-nuevo prefilled, "Compartir" shares summary text), segmented control Gastos | Juegos. Computes everything at render from expenses + settlements via `expense-calculator` (no stored balances).
+  - `src/app/juntada/[id].tsx` — detail: header with balances/transfers (Liquidación section: "Saldar" per transfer opens pago-nuevo prefilled, "Saldar todo" registers every pending transfer in one transaction, "Compartir" shares summary text), segmented control Gastos | Juegos. Computes everything at render from expenses + settlements via `expense-calculator` (no stored balances).
 - Participants are a SNAPSHOT: later changes to people/groups do not affect existing juntadas (decided).
 - NOT implemented: edit juntada (name/date/participants), date picker (always today), close/reopen (`status` column exists, always `active`). Open product decision.
 
@@ -76,9 +76,9 @@ State of each feature and the exact files that implement it. Start here to know 
 ### 4. Settlements / payments (complete)
 
 - Two transfer modes: direct payments and debt minimization (default). Registering a payment (from → to, amount) subtracts from pending transfers.
-- Domain: `expense-calculator.ts` (`calculateBalances`, `calculateDirectTransfers`, `minimizeTransfers`) + `settlement-summary.ts` (`buildSettlementSummaryText`: pure text builder; money via `formatMoneyInt`).
-- Repo: `settlements-repository.ts` (soft delete like expenses).
-- UI: `src/ui/expenses/SettlementForm.tsx` (reusable "quién le paga a quién" form with SearchField) used by `src/app/juntada/pago-nuevo.tsx` (modal `?id=` + optional `?fromId=&toId=&amount=` to prefill from a transfer's "Saldar" button). Summary shared with the native share sheet (`Share.share`) from `[id].tsx`.
+- Domain: `expense-calculator.ts` (`calculateBalances`, `calculateDirectTransfers`, `minimizeTransfers`, `buildSettlementInputs`) + `settlement-summary.ts` (`buildSettlementSummaryText`: pure text builder; money via `formatMoneyInt`).
+- Repo: `settlements-repository.ts` (`createSettlements` bulk insert in one transaction, `createSettlement`, soft delete like expenses).
+- UI: `src/ui/expenses/SettlementForm.tsx` (reusable "quién le paga a quién" form with SearchField) used by `src/app/juntada/pago-nuevo.tsx` (modal `?id=` + optional `?fromId=&toId=&amount=` to prefill from a transfer's "Saldar" button). "Saldar todo" in `[id].tsx` asks for confirmation with the payment count and total, then inserts every pending transfer at once (button is disabled/loading while saving). Summary shared with the native share sheet (`Share.share`) from `[id].tsx`.
 - Game results are NOT included in the summary (explicitly out of scope for the share feature; candidate future extension).
 
 ### 5. Games / matches (complete)
@@ -86,7 +86,7 @@ State of each feature and the exact files that implement it. Start here to know 
 - Matches per juntada: Truco, Generala, Skull King, FIFA (Liga/Copa), Generic. Live scorer, history, multiple matches per game.
 - Domain (pure rules, unit-tested): `src/domain/games/game-types.ts` (`GameId`, `GAME_LABELS`, `Match`, `MatchPlayer`, `TrucoTeam(Size)`) + one folder per game (`truco/`, `generala/`, `skull-king/`, `fifa/`, `generic/`) with scorer + types.
 - Repos: shared `matches-repository.ts` (`matches` + `match_players`, HARD delete with cascade — no soft delete for games), one repo per game (`truco-repository.ts`, `generala-repository.ts`, `skull-king-repository.ts`, `fifa-repository.ts`, `generic-repository.ts`).
-- UI: setup `src/app/juntada/juego-nuevo.tsx` (modal `?id=` + optional `?game=` preselect; player selection with SearchField), scorer dispatch `src/app/juntada/partida.tsx` (`?match=`; branches on `match.game`), scorer components `src/ui/games/{TrucoScorer,GeneralaScorer,SkullKingScorer,FifaScorer,GenericScorer}.tsx`, match list + delete `src/ui/games/GamesSection.tsx` (rendered by `[id].tsx` under Juegos).
+- UI: setup `src/app/juntada/juego-nuevo.tsx` (modal `?id=` + optional `?game=` preselect; player selection with SearchField), scorer dispatch `src/app/juntada/partida.tsx` (`?match=`; branches on `match.game`), scorer components `src/ui/games/{TrucoScorer,GeneralaScorer,SkullKingScorer,FifaScorer,GenericScorer}.tsx`, match list + delete `src/ui/games/GamesSection.tsx` (a `FlatList` with `header`/`footer` props, rendered by `[id].tsx` under Juegos and by the casual tab).
 - Rules live ONLY in domain; screens never compute scores (see Supported Games for the actual rules).
 - Match players/teams cannot be edited after creation (delete + re-create).
 
@@ -134,9 +134,8 @@ src/app            - Expo Router screens (every file is a route)
   /(tabs)/         - index (juntadas), juegos (casual scorekeeper), grupos (people+groups), _layout
   /juntada/        - nueva, [id], gasto-nuevo, gasto-editar, pago-nuevo, juego-nuevo, partida
   /juegos/         - nueva (casual match setup, modal)
-src/app/AppRoot.tsx - EMPTY vestigial file, not mounted anywhere (safe to ignore/remove)
 src/domain         - pure business logic
-  /common/         - Money.ts (formatMoneyInt), text-search.ts (normalizeForSearch/matchesQuery)
+  /common/         - Money.ts (formatMoneyInt), text-search.ts (normalizeForSearch/matchesQuery/compareByName)
   /expenses/       - expense-calculator, expense-types, settlement-summary
   /games/          - game-types + truco/ generala/ skull-king/ fifa/ generic/ (each: scorer + types)
   /get-togethers/  - get-together-types
@@ -242,6 +241,7 @@ All in `src/domain/expenses/expense-calculator.ts`:
 - `calculateBalances(expenses, settlements)`: net = paid - owes (deleted expenses/settlements ignored; a settlement adds to the payer's paid and the receiver's owed)
 - `calculateDirectTransfers(expenses, settlements)`: debtor -> creditor directly against original payers
 - `minimizeTransfers(expenses, settlements)`: default mode
+- `buildSettlementInputs(transfers)`: maps the pending transfers to settlement rows for the bulk "Saldar todo" action
 - `buildSettlementSummaryText(summary)` in `settlement-summary.ts`: plain-text summary (title + total + one line per transfer, or "todo saldado"); money formatted by `formatMoneyInt` in `domain/common/Money.ts`, the single source of truth behind `ui/format.ts` `formatMoney`
 
 ## Debt Minimization Algorithm
@@ -256,7 +256,7 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 - FIFA: tournament for 1v1 matches with manually entered goals. Two modes:
   - Liga: a round-robin round is generated on demand using the circle method (odd player counts rest one per fecha). "Partidos contra cada equipo" is configurable at creation: `null` = infinite (default, rounds keep being appended until the user closes the league), or a positive integer k = fixed schedule of k full round-robin cycles; when the last fecha is played the league finishes automatically. Standings: PJ/PG/PE/PP/GF/GC/DIF/PTS, win 3 / draw 1 / loss 0; tie-break by goal difference, then goals for, then participant order.
   - Copa: single elimination with automatic byes for non-power-of-two participant counts (standard seed order). Winners advance automatically to the next round; finals crown a champion and finish the match. Ties require a penalty winner.
-  - Both modes always surface the next playable game and keep the full match history. `src/domain/games/fifa/fifa-scorer.ts` holds pure rules; `fifa-repository.ts` persists rounds/bracket and advances cup winners.
+  - Both modes always surface the next playable game and keep the full match history. The last saved result can be undone: goals are cleared and, in Copa, the winner is removed from the next bracket slot when that slot has not been played yet. Undoing a finished match reopens it. `src/domain/games/fifa/fifa-scorer.ts` holds pure rules; `fifa-repository.ts` persists rounds/bracket and advances cup winners.
 - Generic: free-form scorekeeper for any other game. Players add integer adjustments (non-zero); totals rank the players (sorted desc, ties share the lead). Used for games without dedicated rules.
 
 ## Games Architecture
@@ -265,6 +265,7 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 - Pure rules per game in `src/domain/games/<game>/` with unit tests in `tests/domain/games/<game>/`.
 - Persistence: `matches` + `match_players` shared, plus one table per game.
 - UI: scorer components in `src/ui/games/`, rendered by `src/app/juntada/partida.tsx` (dispatch by `match.game`). Game logic never lives inside screens.
+- Haptics: all scorers call `src/ui/haptics.ts` (`selectionHaptic`, `lightHaptic`, `successHaptic`) on submit/undo/status changes/finish; the helper swallows unsupported-device errors. Only fire the finish haptic once per completion (check whether the action actually finished the match).
 
 ## Navigation
 
@@ -295,12 +296,12 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 
 - `expo-sqlite`, database `juntadapp.db`, WAL mode, foreign keys ON (set inside `migrateDatabase`).
 - Migrations: `src/infrastructure/persistence/migrations.ts`, versioned with `PRAGMA user_version`.
-- To add a migration: append `{ version: N + 1, sql }` to `MIGRATIONS`. Never edit an applied migration. `npm test` does NOT exercise migrations (domain-only tests), so validate SQL carefully (recreate the DB or bump a test device).
+- To add a migration: append `{ version: N + 1, sql }` to `MIGRATIONS`. Never edit an applied migration. `tests/infrastructure/persistence/migrations.test.ts` runs the real migrations against an in-memory `node:sqlite` database (fresh DB, incremental upgrade and idempotency), so extend it when adding a migration.
 - Repositories take the `SQLiteDatabase` as first argument (obtained in screens with `useSQLiteContext()`).
 
 ## Testing Strategy
 
-- Unit tests for domain logic only (no component tests in v1), in `tests/domain` mirroring `src/domain`.
+- Unit tests for domain logic in `tests/domain` mirroring `src/domain`, plus infrastructure tests (migrations) in `tests/infrastructure`. No component tests in v1.
 - Every new algorithm (splits, balances, game rules, search normalization) must ship with tests.
 - Run: `npm test`. Config: `jest.config.js` (jest-expo preset; coverage excludes `src/ui`).
 - CI runs typecheck + lint + tests on PRs to master; keep them green.
@@ -312,6 +313,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - Destructive actions: always `Alert.alert` confirmation.
 - Reload after mutation: call the local `load()` at the end of the mutation (no cache invalidation layer).
 - Searchable lists: `SearchField` + `matchesQuery` + local `query` state + `EmptyState` when filtered empty.
+- Long lists and form pickers: use `FlatList`/`SectionList` (`ListHeaderComponent` for titles/fields/search, `renderItem` for rows, `ListFooterComponent` for counters/extra controls) instead of `ScrollView` + `.map`; short forms may keep `ScrollView` but people pickers inside them use horizontal `FlatList`s. Use `keyboardShouldPersistTaps="handled"` and `keyboardDismissMode="on-drag"`.
 - Sharing text: pure builder in domain + `Share.share()` in the screen (never build strings in UI).
 - Money: parse inputs to integer with `parseMoneyInput` (Money.ts), display with `formatMoneyInt`; never float arithmetic.
 - Numeric inputs: `TextField` with an explicit numeric `keyboardType` (`number-pad` for non-negative values; iOS `numbers-and-punctuation` / Android `numeric` when signed values are allowed). Text inputs keep the default letters keyboard.
@@ -326,6 +328,9 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - IDs via `expo-crypto` instead of `uuid`
 - Theming via React context + `useColorScheme()` (device-driven); no in-app theme toggle
 - Local-first: no backend/sync/login planned
+- People/groups are ordered in JS with `compareByName` (accent-insensitive) because SQLite `COLLATE NOCASE` only folds ASCII
+- Haptic feedback is a thin, fail-safe wrapper (`src/ui/haptics.ts`) instead of direct `expo-haptics` calls in components
+- Long lists are virtualized (`FlatList`/`SectionList`) to keep large people/game/expense lists responsive
 
 ## Known Limitations
 
@@ -397,12 +402,12 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 ## Current Project Status
 
 - Phase 0 setup complete (Expo SDK 57, deps, jest via jest-expo, eslint, CI)
-- Expense domain + tests, settlements + debt minimization + share summary
+- Expense domain + tests, settlements + debt minimization + share summary + "Saldar todo" bulk payments
 - SQLite schema/migrations v1–v5 + all repositories
 - Full UI: juntadas list/create/detail, expenses create/edit/delete, payments, people/groups with inline edit, search everywhere
 - Games module: Truco, Generala, Skull King, FIFA (Liga infinita / Copa), Generic (domain + tests + repositories + scorers + match list)
 - Casual games tab: play any game without a juntada; finish like juntadas and delete with the trash icon
 - Light/dark theme follows the device color scheme
-- All checks green: `npm test` (101 tests), `npm run lint`, `npm run typecheck`
+- All checks green: `npm test` (125 tests), `npm run lint`, `npm run typecheck`
 
 Next steps (see Future Features): close/reopen juntadas + date picker, then game statistics.

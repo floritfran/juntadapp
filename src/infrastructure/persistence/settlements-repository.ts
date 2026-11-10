@@ -1,6 +1,10 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { Settlement, SettlementId } from '../../domain/expenses/expense-types';
+import {
+  Settlement,
+  SettlementId,
+  SettlementInput,
+} from '../../domain/expenses/expense-types';
 import { GetTogetherId } from '../../domain/get-togethers/get-together-types';
 import { PersonId } from '../../domain/people/person-types';
 import { newId } from '../id';
@@ -42,6 +46,41 @@ export async function listSettlements(
   return rows.map(rowToSettlement);
 }
 
+export async function createSettlements(
+  db: SQLiteDatabase,
+  getTogetherId: GetTogetherId,
+  inputs: SettlementInput[]
+): Promise<Settlement[]> {
+  if (inputs.length === 0) return [];
+  const now = Date.now();
+  const settlements: Settlement[] = inputs.map((input) => ({
+    id: newId(),
+    getTogetherId,
+    fromId: input.fromId,
+    toId: input.toId,
+    amountInt: input.amountInt,
+    createdAt: new Date(now),
+    updatedAt: new Date(now),
+    deletedAt: null,
+  }));
+  await db.withTransactionAsync(async () => {
+    for (const settlement of settlements) {
+      await db.runAsync(
+        `INSERT INTO settlements (id, get_together_id, from_id, to_id, amount_int, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
+        settlement.id,
+        settlement.getTogetherId,
+        settlement.fromId,
+        settlement.toId,
+        settlement.amountInt,
+        now,
+        now
+      );
+    }
+  });
+  return settlements;
+}
+
 export async function createSettlement(
   db: SQLiteDatabase,
   input: {
@@ -51,28 +90,7 @@ export async function createSettlement(
     amountInt: number;
   }
 ): Promise<Settlement> {
-  const now = Date.now();
-  const settlement: Settlement = {
-    id: newId(),
-    getTogetherId: input.getTogetherId,
-    fromId: input.fromId,
-    toId: input.toId,
-    amountInt: input.amountInt,
-    createdAt: new Date(now),
-    updatedAt: new Date(now),
-    deletedAt: null,
-  };
-  await db.runAsync(
-    `INSERT INTO settlements (id, get_together_id, from_id, to_id, amount_int, created_at, updated_at, deleted_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`,
-    settlement.id,
-    settlement.getTogetherId,
-    settlement.fromId,
-    settlement.toId,
-    settlement.amountInt,
-    now,
-    now
-  );
+  const [settlement] = await createSettlements(db, input.getTogetherId, [input]);
   return settlement;
 }
 

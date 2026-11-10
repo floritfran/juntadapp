@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { compareByName } from '../../domain/common/text-search';
 import { Person, PersonId } from '../../domain/people/person-types';
 import { newId } from '../id';
 
@@ -21,16 +22,14 @@ function rowToPerson(row: PersonRow): Person {
 
 export async function listPeople(db: SQLiteDatabase): Promise<Person[]> {
   const rows = await db.getAllAsync<PersonRow>(
-    'SELECT * FROM people WHERE deleted_at IS NULL ORDER BY name COLLATE NOCASE ASC'
+    'SELECT * FROM people WHERE deleted_at IS NULL'
   );
-  return rows.map(rowToPerson);
+  return rows.map(rowToPerson).sort((a, b) => compareByName(a.name, b.name));
 }
 
 export async function listAllPeople(db: SQLiteDatabase): Promise<Person[]> {
-  const rows = await db.getAllAsync<PersonRow>(
-    'SELECT * FROM people ORDER BY name COLLATE NOCASE ASC'
-  );
-  return rows.map(rowToPerson);
+  const rows = await db.getAllAsync<PersonRow>('SELECT * FROM people');
+  return rows.map(rowToPerson).sort((a, b) => compareByName(a.name, b.name));
 }
 
 export async function createPerson(db: SQLiteDatabase, name: string): Promise<Person> {
