@@ -1,4 +1,5 @@
 import {
+  compareByName,
   matchesQuery,
   normalizeForSearch,
 } from '../../../src/domain/common/text-search';
@@ -40,5 +41,29 @@ describe('matchesQuery', () => {
 
   test('does not match unrelated names', () => {
     expect(matchesQuery('Ana', 'facu')).toBe(false);
+  });
+});
+
+describe('compareByName', () => {
+  test('sorts accented names in their alphabetical position', () => {
+    const names = ['Zoe', 'Álvaro', 'Ñandú', 'Ana', 'Ángel'];
+    expect([...names].sort(compareByName)).toEqual([
+      'Álvaro',
+      'Ana',
+      'Ángel',
+      'Ñandú',
+      'Zoe',
+    ]);
+  });
+
+  test('is case-insensitive', () => {
+    expect(compareByName('álvaro', 'Zoe')).toBeLessThan(0);
+    expect(compareByName('ZOE', 'álvaro')).toBeGreaterThan(0);
+  });
+
+  test('breaks normalized ties deterministically', () => {
+    expect(compareByName('Alvaro', 'Álvaro')).toBeLessThan(0);
+    expect(compareByName('Álvaro', 'Alvaro')).toBeGreaterThan(0);
+    expect(compareByName('Ana', 'Ana')).toBe(0);
   });
 });

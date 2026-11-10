@@ -18,6 +18,7 @@ import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
+import { lightHaptic, selectionHaptic, successHaptic } from '@/ui/haptics';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
@@ -105,7 +106,13 @@ export function TrucoScorer({ match, nameOf, onStatusChange }: Props) {
       setRounds(await listTrucoRounds(db, match.id));
       setTeam1Text('');
       setTeam2Text('');
-      await syncFinished(trucoWinner(updated) !== null);
+      const won = trucoWinner(updated) !== null;
+      await syncFinished(won);
+      if (won) {
+        successHaptic();
+      } else {
+        lightHaptic();
+      }
     } catch {
       Alert.alert('Error', 'No se pudo cargar la mano.');
     }
@@ -124,6 +131,7 @@ export function TrucoScorer({ match, nameOf, onStatusChange }: Props) {
           await removeLastTrucoRound(db, match.id);
           setRounds(await listTrucoRounds(db, match.id));
           await syncFinished(false);
+          selectionHaptic();
         },
       },
     ]);
@@ -131,7 +139,10 @@ export function TrucoScorer({ match, nameOf, onStatusChange }: Props) {
 
   const toggleStatus = () => {
     if (status === 'finished') {
-      reopenMatch(db, match.id).then(() => changeStatus('active'));
+      reopenMatch(db, match.id).then(() => {
+        changeStatus('active');
+        selectionHaptic();
+      });
     } else {
       Alert.alert('Finalizar partida', '¿Cerrar la partida ahora?', [
         { text: 'Cancelar', style: 'cancel' },
@@ -140,6 +151,7 @@ export function TrucoScorer({ match, nameOf, onStatusChange }: Props) {
           onPress: async () => {
             await finishMatch(db, match.id);
             changeStatus('finished');
+            successHaptic();
           },
         },
       ]);

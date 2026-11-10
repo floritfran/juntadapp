@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,6 +14,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import {
+  buildSettlementInputs,
   calculateBalances,
   calculateDirectTransfers,
   minimizeTransfers,
@@ -25,7 +26,11 @@ import { Person, PersonId } from '@/domain/people/person-types';
 import { listExpenses, softDeleteExpense } from '@/infrastructure/persistence/expenses-repository';
 import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { listAllPeople } from '@/infrastructure/persistence/people-repository';
-import { listSettlements, softDeleteSettlement } from '@/infrastructure/persistence/settlements-repository';
+import {
+  createSettlements,
+  listSettlements,
+  softDeleteSettlement,
+} from '@/infrastructure/persistence/settlements-repository';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
@@ -51,6 +56,8 @@ export default function JuntadaDetailScreen() {
   const [notFound, setNotFound] = useState(false);
   const [mode, setMode] = useState<SettlementMode>('min');
   const [tab, setTab] = useState<DetailTab>('expenses');
+  const [settlingAll, setSettlingAll] = useState(false);
+  const settlingAllRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -140,6 +147,40 @@ export default function JuntadaDetailScreen() {
       },
     });
 
+  const settleAll = () => {
+    if (!getTogether || transfers.length === 0 || settlingAllRef.current) return;
+    const count = transfers.length;
+    const totalToSettle = transfers.reduce((sum, transfer) => sum + transfer.amount, 0);
+    Alert.alert(
+      'Saldar todo',
+      `¿Registrar ${count === 1 ? '1 pago' : `${count} pagos`} por un total de ${formatMoney(totalToSettle)}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Saldar todo',
+          onPress: async () => {
+            if (settlingAllRef.current) return;
+            settlingAllRef.current = true;
+            setSettlingAll(true);
+            try {
+              await createSettlements(
+                db,
+                getTogether.id,
+                buildSettlementInputs(transfers)
+              );
+              await load();
+            } catch {
+              Alert.alert('Error', 'No se pudieron registrar los pagos.');
+            } finally {
+              settlingAllRef.current = false;
+              setSettlingAll(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const shareSettlement = async () => {
     if (!getTogether) return;
     const text = buildSettlementSummaryText({
@@ -182,57 +223,70 @@ export default function JuntadaDetailScreen() {
     );
   }
 
+  const headerContent = (
+    <>
+      <Card>
+        <View style={styles.headerRow}>
+          <Text numberOfLines={2} style={styles.title}>
+            {getTogether.name}
+          </Text>
+          {getTogether.status === 'closed' ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>Cerrada</Text>
+            </View>
+          ) : null}
+        </View>
+        <Text style={styles.meta}>
+          {formatDate(getTogether.date)} ·{' '}
+          {getTogether.participantIds.length === 1
+            ? '1 participante'
+            : `${getTogether.participantIds.length} participantes`}
+        </Text>
+        <View style={styles.chipsRow}>
+          {getTogether.participantIds.map((personId) => (
+            <Chip key={personId} label={nameOf(personId)} />
+          ))}
+        </View>
+      </Card>
+
+      <View style={styles.segment}>
+        <Pressable
+          onPress={() => setTab('expenses')}
+          style={[styles.segmentItem, tab === 'expenses' && styles.segmentItemActive]}
+        >
+          <Text style={[styles.segmentLabel, tab === 'expenses' && styles.segmentLabelActive]}>
+            Gastos
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setTab('games')}
+          style={[styles.segmentItem, tab === 'games' && styles.segmentItemActive]}
+        >
+          <Text style={[styles.segmentLabel, tab === 'games' && styles.segmentLabelActive]}>
+            Juegos
+          </Text>
+        </Pressable>
+      </View>
+    </>
+  );
+
+  if (tab === 'games') {
+    return (
+      <Screen>
+        <GamesSection
+          contentContainerStyle={styles.content}
+          getTogetherId={id ?? ''}
+          header={headerContent}
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
-        <Card>
-          <View style={styles.headerRow}>
-            <Text numberOfLines={2} style={styles.title}>
-              {getTogether.name}
-            </Text>
-            {getTogether.status === 'closed' ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>Cerrada</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.meta}>
-            {formatDate(getTogether.date)} ·{' '}
-            {getTogether.participantIds.length === 1
-              ? '1 participante'
-              : `${getTogether.participantIds.length} participantes`}
-          </Text>
-          <View style={styles.chipsRow}>
-            {getTogether.participantIds.map((personId) => (
-              <Chip key={personId} label={nameOf(personId)} />
-            ))}
-          </View>
-        </Card>
-
-        <View style={styles.segment}>
-          <Pressable
-            onPress={() => setTab('expenses')}
-            style={[styles.segmentItem, tab === 'expenses' && styles.segmentItemActive]}
-          >
-            <Text style={[styles.segmentLabel, tab === 'expenses' && styles.segmentLabelActive]}>
-              Gastos
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setTab('games')}
-            style={[styles.segmentItem, tab === 'games' && styles.segmentItemActive]}
-          >
-            <Text style={[styles.segmentLabel, tab === 'games' && styles.segmentLabelActive]}>
-              Juegos
-            </Text>
-          </Pressable>
-        </View>
-
-        {tab === 'games' ? (
-          <GamesSection getTogetherId={id ?? ''} />
-        ) : (
-          <>
-            <View style={styles.sectionRow}>
+        {headerContent}
+        <View style={styles.sectionRow}>
               <SectionTitle style={styles.flex} title="Gastos" />
               <Button
                 onPress={() =>
@@ -370,6 +424,15 @@ export default function JuntadaDetailScreen() {
                   <Text style={styles.transferTotal}>
                     Total de transferencias: {transfers.length}
                   </Text>
+                  {transfers.length > 0 ? (
+                    <Button
+                      disabled={settlingAll}
+                      loading={settlingAll}
+                      onPress={settleAll}
+                      style={styles.settleAllButton}
+                      title="Saldar todo"
+                    />
+                  ) : null}
                 </Card>
 
                 <Text style={styles.subTitle}>Balances</Text>
@@ -390,8 +453,6 @@ export default function JuntadaDetailScreen() {
                   ))}
               </>
             )}
-          </>
-        )}
       </ScrollView>
     </Screen>
   );
@@ -561,6 +622,10 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '600',
     marginTop: spacing.sm,
+  },
+  settleAllButton: {
+    marginTop: spacing.md,
+    minHeight: 44,
   },
   subTitle: {
     color: colors.text,

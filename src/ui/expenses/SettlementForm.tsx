@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -117,28 +117,38 @@ export function SettlementForm({
         ) : (
           <>
             <SectionTitle style={styles.section} title="¿Quién puso la plata?" />
-            <View style={styles.chipsRow}>
-              {filteredParticipants.map((person) => (
+            <FlatList
+              contentContainerStyle={styles.chipsList}
+              data={filteredParticipants}
+              horizontal
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(person) => `from-${person.id}`}
+              renderItem={({ item: person }) => (
                 <Chip
-                  key={person.id}
                   label={person.name}
                   onPress={() => setFromId(person.id)}
                   selected={fromId === person.id}
                 />
-              ))}
-            </View>
+              )}
+              showsHorizontalScrollIndicator={false}
+            />
 
             <SectionTitle style={styles.section} title="¿Quién la recibió?" />
-            <View style={styles.chipsRow}>
-              {filteredParticipants.map((person) => (
+            <FlatList
+              contentContainerStyle={styles.chipsList}
+              data={filteredParticipants}
+              horizontal
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(person) => `to-${person.id}`}
+              renderItem={({ item: person }) => (
                 <Chip
-                  key={person.id}
                   label={person.name}
                   onPress={() => setToId(person.id)}
                   selected={toId === person.id}
                 />
-              ))}
-            </View>
+              )}
+              showsHorizontalScrollIndicator={false}
+            />
             <Text style={styles.hint}>El pago se descuenta de las liquidaciones pendientes.</Text>
           </>
         )}
@@ -183,9 +193,8 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
   section: {
     marginTop: spacing.md,
   },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  chipsList: {
+    paddingRight: spacing.sm,
   },
   hint: {
     color: colors.textMuted,

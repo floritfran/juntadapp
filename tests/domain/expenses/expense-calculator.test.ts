@@ -1,5 +1,6 @@
 import { Expense, PersonId, Settlement } from '../../../src/domain/expenses/expense-types';
 import {
+  buildSettlementInputs,
   calculateBalances,
   calculateDirectTransfers,
   calculateShares,
@@ -138,5 +139,39 @@ describe('expenses - saldar deudas', () => {
     const e = exp('e1', p('a'), 30, [p('a'), p('b')]);
     const bals = calculateBalances([e], [stl('s1', p('b'), p('a'), 15, { deletedAt: new Date() })]);
     expect(bals.find((b) => b.personId === p('b'))?.net).toBe(-15);
+  });
+});
+
+describe('expenses - saldar todo', () => {
+  test('builds one settlement input per transfer', () => {
+    const transfers = [
+      { from: p('b'), to: p('a'), amount: 10 },
+      { from: p('c'), to: p('a'), amount: 5 },
+    ];
+    expect(buildSettlementInputs(transfers)).toEqual([
+      { fromId: p('b'), toId: p('a'), amountInt: 10 },
+      { fromId: p('c'), toId: p('a'), amountInt: 5 },
+    ]);
+  });
+
+  test('returns an empty batch when there is nothing to settle', () => {
+    expect(buildSettlementInputs([])).toEqual([]);
+  });
+
+  test('registering every transfer clears the balances', () => {
+    const expenses = [
+      exp('e1', p('a'), 30, [p('a'), p('b'), p('c')]),
+      exp('e2', p('b'), 12, [p('a'), p('b')]),
+    ];
+    const transfers = minimizeTransfers(expenses);
+    const inputs = buildSettlementInputs(transfers);
+    const settlements = inputs.map((input, index) =>
+      stl(`s${index}`, input.fromId, input.toId, input.amountInt)
+    );
+
+    expect(calculateBalances(expenses, settlements).every((balance) => balance.net === 0)).toBe(
+      true
+    );
+    expect(minimizeTransfers(expenses, settlements)).toEqual([]);
   });
 });

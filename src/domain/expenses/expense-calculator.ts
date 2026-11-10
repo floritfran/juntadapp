@@ -1,5 +1,12 @@
 import { MoneyInt, splitEvenly } from '../common/Money';
-import { Balance, Expense, PersonId, Settlement, Transfer } from './expense-types';
+import {
+  Balance,
+  Expense,
+  PersonId,
+  Settlement,
+  SettlementInput,
+  Transfer,
+} from './expense-types';
 
 export function calculateShares(expense: Expense): Record<PersonId, MoneyInt> {
   const participants = expense.participantIds;
@@ -109,4 +116,12 @@ export function minimizeTransfers(
     if (d.amount === 0) j++;
   }
   return transfers;
+}
+
+export function buildSettlementInputs(transfers: Transfer[]): SettlementInput[] {
+  return transfers.map((transfer) => ({
+    fromId: transfer.from,
+    toId: transfer.to,
+    amountInt: transfer.amount,
+  }));
 }

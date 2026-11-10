@@ -42,3 +42,9 @@ export interface Transfer {
   to: PersonId;
   amount: MoneyInt;
 }
+
+export interface SettlementInput {
+  fromId: PersonId;
+  toId: PersonId;
+  amountInt: MoneyInt;
+}

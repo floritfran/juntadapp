@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import dayjs from 'dayjs';
@@ -134,116 +134,130 @@ export default function NuevaJuntadaScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
-        <TextField
-          autoCapitalize="sentences"
-          label="Nombre"
-          onChangeText={setName}
-          placeholder="Ej: Asado en casa de Juan"
-          value={name}
-        />
-        <View style={styles.dateRow}>
-          <Text style={styles.dateLabel}>Fecha</Text>
-          <Text style={styles.dateValue}>{formatDate(new Date())}</Text>
-        </View>
-
-        {groups.length > 0 ? (
-          <>
-            <SectionTitle style={styles.section} title="Cargar desde un grupo" />
-            <View style={styles.chipsRow}>
-              {groups.map((group) => (
-                <Chip
-                  key={group.id}
-                  label={`${group.name} (${
-                    group.memberIds.filter((personId) => activePersonIds.has(personId)).length
-                  })`}
-                  onPress={() => applyGroup(group)}
-                  selected={selectedGroupId === group.id}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        <SectionTitle style={styles.section} title="Participantes" />
-        {people.length === 0 ? (
-          <EmptyState
-            icon="person-outline"
-            message="Necesitás cargar personas antes de crear una juntada."
-            title="Sin personas"
-          >
-            <Button
-              onPress={() => router.push('/grupos')}
-              style={styles.emptyButton}
-              title="Ir a Grupos"
-              variant="secondary"
-            />
-          </EmptyState>
-        ) : (
-          <>
-            <SearchField onChangeText={setPersonQuery} value={personQuery} />
-            {filteredPeople.length === 0 ? (
-              <EmptyState
-                icon="search-outline"
-                message="Probá con otro nombre."
-                title="No se encontraron personas"
-              />
-            ) : (
-              filteredPeople.map((person) => (
-                <CheckRow
-                  checked={selectedIds.includes(person.id)}
-                  key={person.id}
-                  label={person.name}
-                  onToggle={() => togglePerson(person.id)}
-                />
-              ))
-            )}
-            {showNewPerson ? (
-              <View style={styles.newPerson}>
-                <TextField
-                  autoCapitalize="words"
-                  label="Otra persona"
-                  onChangeText={setNewPersonName}
-                  onSubmitEditing={addPerson}
-                  placeholder="Nombre"
-                  returnKeyType="done"
-                  value={newPersonName}
-                />
-                <View style={styles.newPersonActions}>
-                  <Button
-                    disabled={!newPersonName.trim() || savingPerson}
-                    loading={savingPerson}
-                    onPress={addPerson}
-                    style={styles.flex}
-                    title="Agregar"
+      <FlatList
+        contentContainerStyle={styles.content}
+        data={people.length === 0 ? [] : filteredPeople}
+        keyExtractor={(person) => person.id}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        ListFooterComponent={
+          people.length > 0 ? (
+            <>
+              {showNewPerson ? (
+                <View style={styles.newPerson}>
+                  <TextField
+                    autoCapitalize="words"
+                    label="Otra persona"
+                    onChangeText={setNewPersonName}
+                    onSubmitEditing={addPerson}
+                    placeholder="Nombre"
+                    returnKeyType="done"
+                    value={newPersonName}
                   />
-                  <Button
-                    onPress={() => {
-                      setShowNewPerson(false);
-                      setNewPersonName('');
-                    }}
-                    style={styles.flex}
-                    title="Cancelar"
-                    variant="secondary"
-                  />
+                  <View style={styles.newPersonActions}>
+                    <Button
+                      disabled={!newPersonName.trim() || savingPerson}
+                      loading={savingPerson}
+                      onPress={addPerson}
+                      style={styles.flex}
+                      title="Agregar"
+                    />
+                    <Button
+                      onPress={() => {
+                        setShowNewPerson(false);
+                        setNewPersonName('');
+                      }}
+                      style={styles.flex}
+                      title="Cancelar"
+                      variant="secondary"
+                    />
+                  </View>
                 </View>
-              </View>
+              ) : (
+                <Button
+                  onPress={() => setShowNewPerson(true)}
+                  style={styles.addPersonButton}
+                  title="+ Otra persona"
+                  variant="secondary"
+                />
+              )}
+              <Text style={styles.counter}>
+                {selectedIds.length === 1
+                  ? '1 participante seleccionado'
+                  : `${selectedIds.length} participantes seleccionados`}
+              </Text>
+            </>
+          ) : null
+        }
+        ListHeaderComponent={
+          <>
+            <TextField
+              autoCapitalize="sentences"
+              label="Nombre"
+              onChangeText={setName}
+              placeholder="Ej: Asado en casa de Juan"
+              value={name}
+            />
+            <View style={styles.dateRow}>
+              <Text style={styles.dateLabel}>Fecha</Text>
+              <Text style={styles.dateValue}>{formatDate(new Date())}</Text>
+            </View>
+
+            {groups.length > 0 ? (
+              <>
+                <SectionTitle style={styles.section} title="Cargar desde un grupo" />
+                <View style={styles.chipsRow}>
+                  {groups.map((group) => (
+                    <Chip
+                      key={group.id}
+                      label={`${group.name} (${
+                        group.memberIds.filter((personId) => activePersonIds.has(personId)).length
+                      })`}
+                      onPress={() => applyGroup(group)}
+                      selected={selectedGroupId === group.id}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            <SectionTitle style={styles.section} title="Participantes" />
+            {people.length === 0 ? (
+              <EmptyState
+                icon="person-outline"
+                message="Necesitás cargar personas antes de crear una juntada."
+                title="Sin personas"
+              >
+                <Button
+                  onPress={() => router.push('/grupos')}
+                  style={styles.emptyButton}
+                  title="Ir a Grupos"
+                  variant="secondary"
+                />
+              </EmptyState>
             ) : (
-              <Button
-                onPress={() => setShowNewPerson(true)}
-                style={styles.addPersonButton}
-                title="+ Otra persona"
-                variant="secondary"
-              />
+              <>
+                <SearchField onChangeText={setPersonQuery} value={personQuery} />
+                {filteredPeople.length === 0 ? (
+                  <EmptyState
+                    icon="search-outline"
+                    message="Probá con otro nombre."
+                    title="No se encontraron personas"
+                  />
+                ) : null}
+              </>
             )}
-            <Text style={styles.counter}>
-              {selectedIds.length === 1
-                ? '1 participante seleccionado'
-                : `${selectedIds.length} participantes seleccionados`}
-            </Text>
           </>
+        }
+        renderItem={({ item: person }) => (
+          <CheckRow
+            checked={selectedIds.includes(person.id)}
+            label={person.name}
+            onToggle={() => togglePerson(person.id)}
+          />
         )}
-      </ScrollView>
+        style={styles.list}
+      />
       <View style={styles.footer}>
         <Button disabled={people.length === 0} loading={saving} onPress={submit} title="Crear juntada" />
       </View>
@@ -252,6 +266,9 @@ export default function NuevaJuntadaScreen() {
 }
 
 const makeStyles = (colors: Colors) => StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     alignItems: 'center',

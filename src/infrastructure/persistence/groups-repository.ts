@@ -1,5 +1,6 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { compareByName } from '../../domain/common/text-search';
 import { Group, GroupId } from '../../domain/groups/group-types';
 import { Person, PersonId } from '../../domain/people/person-types';
 import { newId } from '../id';
@@ -27,7 +28,7 @@ export async function listGroups(db: SQLiteDatabase): Promise<GroupWithMembers[]
        LEFT JOIN group_members gm ON gm.group_id = g.id
        LEFT JOIN people p ON p.id = gm.person_id AND p.deleted_at IS NULL
       WHERE g.deleted_at IS NULL
-      ORDER BY g.name COLLATE NOCASE ASC, gm.position ASC`
+      ORDER BY gm.position ASC`
   );
 
   const groups = new Map<GroupId, GroupWithMembers>();
@@ -55,7 +56,7 @@ export async function listGroups(db: SQLiteDatabase): Promise<GroupWithMembers[]
       entry.members.push(member);
     }
   }
-  return [...groups.values()];
+  return [...groups.values()].sort((a, b) => compareByName(a.name, b.name));
 }
 
 export async function createGroup(

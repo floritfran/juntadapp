@@ -10,10 +10,12 @@ import {
   cupChampion,
   fifaGameWinner,
   isLeagueComplete,
+  lastPlayedGame,
   leagueStandings,
   leagueTotalRounds,
   nextLeagueRoundIndex,
   nextPlayableGame,
+  planCupUndo,
   validateFifaResult,
   validateFifaScores,
 } from '@/domain/games/fifa/fifa-scorer';
@@ -22,6 +24,7 @@ import {
   FifaTournament,
   getFifaTournament,
   saveFifaResult,
+  undoFifaResult,
 } from '@/infrastructure/persistence/fifa-repository';
 import { finishMatch, reopenMatch } from '@/infrastructure/persistence/matches-repository';
 import { Button } from '@/ui/components/Button';
@@ -29,6 +32,7 @@ import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
+import { lightHaptic, selectionHaptic, successHaptic } from '@/ui/haptics';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
@@ -100,6 +104,7 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
   const playedGames = games
     .filter((game) => game.score1 !== null && game.score2 !== null)
     .sort((a, b) => b.round - a.round || b.slot - a.slot);
+  const lastPlayed = lastPlayedGame(games);
   const totalRounds = games.length > 0 ? Math.max(...games.map((game) => game.round)) + 1 : 0;
   const leagueTotal =
     mode === 'league'
@@ -145,6 +150,7 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
     }
 
     setSaving(true);
+    let finishedNow = false;
     try {
       if (mode === 'league') {
         await saveFifaResult(db, { matchId: match.id, gameId: nextGame.id, result });
@@ -155,6 +161,7 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
           if (total !== null && nextRound >= total) {
             await finishMatch(db, match.id);
             changeStatus('finished');
+            finishedNow = true;
           } else {
             await appendFifaLeagueRound(db, {
               matchId: match.id,
@@ -181,12 +188,18 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
         if (plan.championId) {
           await finishMatch(db, match.id);
           changeStatus('finished');
+          finishedNow = true;
         }
       }
       setScore1Input('');
       setScore2Input('');
       setPenaltyWinnerId(null);
       await load();
+      if (finishedNow) {
+        successHaptic();
+      } else {
+        lightHaptic();
+      }
     } catch {
       Alert.alert('Error', 'No se pudo guardar el resultado.');
     } finally {
@@ -196,7 +209,12 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
 
   const toggleStatus = () => {
     if (status === 'finished') {
-      reopenMatch(db, match.id).then(() => changeStatus('active')).catch(() => undefined);
+      reopenMatch(db, match.id)
+        .then(() => {
+          changeStatus('active');
+          selectionHaptic();
+        })
+        .catch(() => undefined);
       return;
     }
     Alert.alert('Finalizar liga', '¿Cerrar la liga con la tabla actual?', [
@@ -206,9 +224,53 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
         onPress: async () => {
           await finishMatch(db, match.id);
           changeStatus('finished');
+          successHaptic();
         },
       },
     ]);
+  };
+
+  const undoLast = () => {
+    const game = lastPlayed;
+    if (!game) return;
+    const player1 = game.player1Id ? nameOf(game.player1Id) : '?';
+    const player2 = game.player2Id ? nameOf(game.player2Id) : '?';
+    Alert.alert(
+      'Deshacer último partido',
+      `¿Revertir ${player1} ${game.score1} - ${game.score2} ${player2}?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Deshacer',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const clearAdvance =
+                mode === 'cup' ? planCupUndo(games, game.id).clearAdvance : null;
+              await undoFifaResult(db, {
+                matchId: match.id,
+                gameId: game.id,
+                clearAdvance,
+              });
+              if (status === 'finished') {
+                await reopenMatch(db, match.id);
+                changeStatus('active');
+              }
+              setScore1Input('');
+              setScore2Input('');
+              setPenaltyWinnerId(null);
+              await load();
+              selectionHaptic();
+            } catch {
+              Alert.alert('Error', 'No se pudo deshacer el resultado.');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const canPlay =
@@ -380,6 +442,16 @@ export function FifaScorer({ match, nameOf, onStatusChange }: Props) {
       ) : null}
 
       <SectionTitle style={styles.section} title="Historial de partidos" />
+      {lastPlayed ? (
+        <Button
+          disabled={saving}
+          loading={saving}
+          onPress={undoLast}
+          style={styles.undoButton}
+          title="Deshacer último partido"
+          variant="secondary"
+        />
+      ) : null}
       {playedGames.length === 0 ? (
         <Text style={styles.emptyHistory}>Todavía no hay partidos jugados.</Text>
       ) : (
@@ -549,6 +621,9 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '700',
     marginHorizontal: spacing.sm,
+  },
+  undoButton: {
+    marginBottom: spacing.md,
   },
   emptyHistory: {
     color: colors.textMuted,

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -242,183 +242,196 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
-        <SectionTitle title="Juego" />
-        <View style={styles.chipsRow}>
-          {GAMES.map((value) => (
-            <Chip
-              key={value}
-              label={GAME_LABELS[value]}
-              onPress={() => setGame(value)}
-              selected={game === value}
-            />
-          ))}
-        </View>
-
-        {game === 'truco' ? (
+      <FlatList
+        contentContainerStyle={styles.content}
+        data={visiblePeople.length === 0 ? [] : filteredPeople}
+        keyExtractor={(person) => person.id}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        ListFooterComponent={
           <>
-            <SectionTitle style={styles.section} title="Formato" />
-            <View style={styles.chipsRow}>
-              {TEAM_SIZES.map((size) => (
-                <Chip
-                  key={size}
-                  label={`${size}v${size}`}
-                  onPress={() => changeTeamSize(size)}
-                  selected={teamSize === size}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        {game === 'fifa' ? (
-          <>
-            <SectionTitle style={styles.section} title="Modo" />
-            <View style={styles.chipsRow}>
-              {FIFA_MODES.map((mode) => (
-                <Chip
-                  key={mode}
-                  label={FIFA_MODE_LABELS[mode]}
-                  onPress={() => setFifaMode(mode)}
-                  selected={fifaMode === mode}
-                />
-              ))}
-            </View>
-            {fifaMode === 'league' ? (
+            {visiblePeople.length > 0 ? (
+              <Text style={styles.counter}>
+                {selectedIds.length === 1
+                  ? '1 jugador seleccionado'
+                  : `${selectedIds.length} jugadores seleccionados`}
+              </Text>
+            ) : null}
+            {game === 'truco' && selectedIds.length > 0 ? (
               <>
-                <SectionTitle style={styles.section} title="Partidos contra cada equipo" />
+                <SectionTitle style={styles.section} title="Equipos" />
+                <Text style={styles.teamCounter}>
+                  Equipo A: {team1Count} · Equipo B: {team2Count} {team1Count === team2Count ? '✓' : ''}
+                </Text>
+                {selectedIds.map((personId) => {
+                  const person = people.find((value) => value.id === personId);
+                  const team = teamByPerson[personId] ?? 1;
+                  return (
+                    <View key={personId} style={styles.teamRow}>
+                      <Text numberOfLines={1} style={[styles.teamName, styles.flex]}>
+                        {person?.name ?? 'Persona'}
+                      </Text>
+                      <Chip label="Equipo A" onPress={() => toggleTeam(personId)} selected={team === 1} />
+                      <Chip label="Equipo B" onPress={() => toggleTeam(personId)} selected={team === 2} />
+                    </View>
+                  );
+                })}
+              </>
+            ) : null}
+          </>
+        }
+        ListHeaderComponent={
+          <>
+            <SectionTitle title="Juego" />
+            <View style={styles.chipsRow}>
+              {GAMES.map((value) => (
+                <Chip
+                  key={value}
+                  label={GAME_LABELS[value]}
+                  onPress={() => setGame(value)}
+                  selected={game === value}
+                />
+              ))}
+            </View>
+
+            {game === 'truco' ? (
+              <>
+                <SectionTitle style={styles.section} title="Formato" />
                 <View style={styles.chipsRow}>
-                  <Chip
-                    label="Sin límite"
-                    onPress={() => setMatchesPerOpponent(null)}
-                    selected={matchesPerOpponent === null}
-                  />
-                  {[1, 2, 3].map((value) => (
+                  {TEAM_SIZES.map((size) => (
                     <Chip
-                      key={value}
-                      label={String(value)}
-                      onPress={() => setMatchesPerOpponent(value)}
-                      selected={matchesPerOpponent === value}
+                      key={size}
+                      label={`${size}v${size}`}
+                      onPress={() => changeTeamSize(size)}
+                      selected={teamSize === size}
                     />
                   ))}
                 </View>
-                <Text style={styles.counter}>
-                  {matchesPerOpponent === null
-                    ? 'Liga infinita: se juega fecha tras fecha hasta que la finalices.'
-                    : totalLeagueRounds === null
-                      ? `${matchesPerOpponent} partido(s) contra cada equipo.`
-                      : `${matchesPerOpponent} partido(s) contra cada equipo: se jugarán ${totalLeagueRounds} fechas.`}
-                </Text>
               </>
-            ) : (
-              <Text style={styles.counter}>
-                Copa: eliminación directa; si hay empate se define por penales.
-              </Text>
-            )}
-          </>
-        ) : null}
+            ) : null}
 
-        {!isJuntada && groups.length > 0 ? (
-          <>
-            <SectionTitle style={styles.section} title="Cargar desde un grupo" />
-            <View style={styles.chipsRow}>
-              {groups.map((group) => (
-                <Chip
-                  key={group.id}
-                  label={`${group.name} (${
-                    group.memberIds.filter((personId) => activePersonIds.has(personId)).length
-                  })`}
-                  onPress={() => applyGroup(group)}
-                  selected={selectedGroupId === group.id}
-                />
-              ))}
-            </View>
-          </>
-        ) : null}
-
-        <SectionTitle style={styles.section} title="Jugadores" />
-        {!isJuntada ? (
-          <View style={styles.createPersonRow}>
-            <View style={styles.flex}>
-              <TextField
-                autoCapitalize="words"
-                label="Nueva persona"
-                onChangeText={setNewPersonName}
-                onSubmitEditing={addPerson}
-                placeholder="Nombre"
-                returnKeyType="done"
-                value={newPersonName}
-              />
-            </View>
-            <Button
-              disabled={!newPersonName.trim()}
-              loading={creatingPerson}
-              onPress={addPerson}
-              style={styles.createPersonButton}
-              title="Agregar"
-            />
-          </View>
-        ) : null}
-
-        {visiblePeople.length === 0 ? (
-          <EmptyState
-            icon="person-outline"
-            message={
-              isJuntada
-                ? 'Esta juntada no tiene participantes cargados.'
-                : 'Cargá personas para empezar una partida.'
-            }
-            title={isJuntada ? 'Sin participantes' : 'Sin personas'}
-          />
-        ) : (
-          <>
-            <SearchField onChangeText={setPersonQuery} value={personQuery} />
-            {filteredPeople.length === 0 ? (
-              <EmptyState
-                icon="search-outline"
-                message="Probá con otro nombre."
-                title="No se encontraron personas"
-              />
-            ) : (
-              filteredPeople.map((person) => (
-                <CheckRow
-                  checked={selectedIds.includes(person.id)}
-                  key={person.id}
-                  label={person.name}
-                  onToggle={() => togglePerson(person.id)}
-                />
-              ))
-            )}
-            <Text style={styles.counter}>
-              {selectedIds.length === 1
-                ? '1 jugador seleccionado'
-                : `${selectedIds.length} jugadores seleccionados`}
-            </Text>
-          </>
-        )}
-
-        {game === 'truco' && selectedIds.length > 0 ? (
-          <>
-            <SectionTitle style={styles.section} title="Equipos" />
-            <Text style={styles.teamCounter}>
-              Equipo A: {team1Count} · Equipo B: {team2Count} {team1Count === team2Count ? '✓' : ''}
-            </Text>
-            {selectedIds.map((personId) => {
-              const person = people.find((value) => value.id === personId);
-              const team = teamByPerson[personId] ?? 1;
-              return (
-                <View key={personId} style={styles.teamRow}>
-                  <Text numberOfLines={1} style={[styles.teamName, styles.flex]}>
-                    {person?.name ?? 'Persona'}
-                  </Text>
-                  <Chip label="Equipo A" onPress={() => toggleTeam(personId)} selected={team === 1} />
-                  <Chip label="Equipo B" onPress={() => toggleTeam(personId)} selected={team === 2} />
+            {game === 'fifa' ? (
+              <>
+                <SectionTitle style={styles.section} title="Modo" />
+                <View style={styles.chipsRow}>
+                  {FIFA_MODES.map((mode) => (
+                    <Chip
+                      key={mode}
+                      label={FIFA_MODE_LABELS[mode]}
+                      onPress={() => setFifaMode(mode)}
+                      selected={fifaMode === mode}
+                    />
+                  ))}
                 </View>
-              );
-            })}
+                {fifaMode === 'league' ? (
+                  <>
+                    <SectionTitle style={styles.section} title="Partidos contra cada equipo" />
+                    <View style={styles.chipsRow}>
+                      <Chip
+                        label="Sin límite"
+                        onPress={() => setMatchesPerOpponent(null)}
+                        selected={matchesPerOpponent === null}
+                      />
+                      {[1, 2, 3].map((value) => (
+                        <Chip
+                          key={value}
+                          label={String(value)}
+                          onPress={() => setMatchesPerOpponent(value)}
+                          selected={matchesPerOpponent === value}
+                        />
+                      ))}
+                    </View>
+                    <Text style={styles.counter}>
+                      {matchesPerOpponent === null
+                        ? 'Liga infinita: se juega fecha tras fecha hasta que la finalices.'
+                        : totalLeagueRounds === null
+                          ? `${matchesPerOpponent} partido(s) contra cada equipo.`
+                          : `${matchesPerOpponent} partido(s) contra cada equipo: se jugarán ${totalLeagueRounds} fechas.`}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.counter}>
+                    Copa: eliminación directa; si hay empate se define por penales.
+                  </Text>
+                )}
+              </>
+            ) : null}
+
+            {!isJuntada && groups.length > 0 ? (
+              <>
+                <SectionTitle style={styles.section} title="Cargar desde un grupo" />
+                <View style={styles.chipsRow}>
+                  {groups.map((group) => (
+                    <Chip
+                      key={group.id}
+                      label={`${group.name} (${
+                        group.memberIds.filter((personId) => activePersonIds.has(personId)).length
+                      })`}
+                      onPress={() => applyGroup(group)}
+                      selected={selectedGroupId === group.id}
+                    />
+                  ))}
+                </View>
+              </>
+            ) : null}
+
+            <SectionTitle style={styles.section} title="Jugadores" />
+            {!isJuntada ? (
+              <View style={styles.createPersonRow}>
+                <View style={styles.flex}>
+                  <TextField
+                    autoCapitalize="words"
+                    label="Nueva persona"
+                    onChangeText={setNewPersonName}
+                    onSubmitEditing={addPerson}
+                    placeholder="Nombre"
+                    returnKeyType="done"
+                    value={newPersonName}
+                  />
+                </View>
+                <Button
+                  disabled={!newPersonName.trim()}
+                  loading={creatingPerson}
+                  onPress={addPerson}
+                  style={styles.createPersonButton}
+                  title="Agregar"
+                />
+              </View>
+            ) : null}
+
+            {visiblePeople.length === 0 ? (
+              <EmptyState
+                icon="person-outline"
+                message={
+                  isJuntada
+                    ? 'Esta juntada no tiene participantes cargados.'
+                    : 'Cargá personas para empezar una partida.'
+                }
+                title={isJuntada ? 'Sin participantes' : 'Sin personas'}
+              />
+            ) : (
+              <>
+                <SearchField onChangeText={setPersonQuery} value={personQuery} />
+                {filteredPeople.length === 0 ? (
+                  <EmptyState
+                    icon="search-outline"
+                    message="Probá con otro nombre."
+                    title="No se encontraron personas"
+                  />
+                ) : null}
+              </>
+            )}
           </>
-        ) : null}
-      </ScrollView>
+        }
+        renderItem={({ item: person }) => (
+          <CheckRow
+            checked={selectedIds.includes(person.id)}
+            label={person.name}
+            onToggle={() => togglePerson(person.id)}
+          />
+        )}
+        style={styles.list}
+      />
       <View style={styles.footer}>
         <Button disabled={people.length === 0} loading={saving} onPress={submit} title="Iniciar partida" />
       </View>
@@ -427,6 +440,9 @@ export function NewMatchForm({ targetGetTogetherId, prefillFromGetTogetherId, in
 }
 
 const makeStyles = (colors: Colors) => StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -125,55 +125,68 @@ export function ExpenseForm({
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content}>
-        <TextField
-          autoCapitalize="sentences"
-          label="Descripción"
-          onChangeText={setDescription}
-          placeholder="Ej: Carne para el asado"
-          value={description}
-        />
-        <TextField
-          keyboardType="number-pad"
-          label="Monto ($)"
-          onChangeText={onAmountChange}
-          placeholder="0"
-          value={amountText}
-        />
-        {amountInt > 0 ? <Text style={styles.amountPreview}>{formatMoney(amountInt)}</Text> : null}
-
-        <SearchField onChangeText={setPersonQuery} value={personQuery} />
-        {filteredParticipants.length === 0 ? (
-          <Text style={styles.hint}>No se encontraron personas.</Text>
-        ) : (
-          <>
-            <SectionTitle style={styles.section} title="¿Quién pagó?" />
-            <View style={styles.chipsRow}>
-              {filteredParticipants.map((person) => (
-                <Chip
-                  key={person.id}
-                  label={person.name}
-                  onPress={() => setPayerId(person.id)}
-                  selected={payerId === person.id}
-                />
-              ))}
-            </View>
-
-            <SectionTitle style={styles.section} title="¿Quiénes participan?" />
-            {filteredParticipants.map((person) => (
-              <CheckRow
-                checked={participantIds.includes(person.id)}
-                key={person.id}
-                label={person.name}
-                onToggle={() => toggleParticipant(person.id)}
-              />
-            ))}
+      <FlatList
+        contentContainerStyle={styles.content}
+        data={filteredParticipants}
+        keyExtractor={(person) => person.id}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        ListFooterComponent={
+          filteredParticipants.length > 0 ? (
             <Text style={styles.hint}>
               La división se reparte en partes iguales entre los participantes.
             </Text>
+          ) : null
+        }
+        ListHeaderComponent={
+          <>
+            <TextField
+              autoCapitalize="sentences"
+              label="Descripción"
+              onChangeText={setDescription}
+              placeholder="Ej: Carne para el asado"
+              value={description}
+            />
+            <TextField
+              keyboardType="number-pad"
+              label="Monto ($)"
+              onChangeText={onAmountChange}
+              placeholder="0"
+              value={amountText}
+            />
+            {amountInt > 0 ? <Text style={styles.amountPreview}>{formatMoney(amountInt)}</Text> : null}
+
+            <SearchField onChangeText={setPersonQuery} value={personQuery} />
+            {filteredParticipants.length === 0 ? (
+              <Text style={styles.hint}>No se encontraron personas.</Text>
+            ) : (
+              <>
+                <SectionTitle style={styles.section} title="¿Quién pagó?" />
+                <View style={styles.chipsRow}>
+                  {filteredParticipants.map((person) => (
+                    <Chip
+                      key={person.id}
+                      label={person.name}
+                      onPress={() => setPayerId(person.id)}
+                      selected={payerId === person.id}
+                    />
+                  ))}
+                </View>
+
+                <SectionTitle style={styles.section} title="¿Quiénes participan?" />
+              </>
+            )}
           </>
+        }
+        renderItem={({ item: person }) => (
+          <CheckRow
+            checked={participantIds.includes(person.id)}
+            label={person.name}
+            onToggle={() => toggleParticipant(person.id)}
+          />
         )}
-      </ScrollView>
+        style={styles.list}
+      />
       <View style={styles.footer}>
         <Button
           loading={saving}
@@ -199,6 +212,9 @@ export function ExpenseFormLoading() {
 }
 
 const makeStyles = (colors: Colors) => StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     alignItems: 'center',

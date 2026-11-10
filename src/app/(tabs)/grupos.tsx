@@ -1,6 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  SectionList,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -31,6 +39,16 @@ import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
 import { fontSize, radius, spacing, useColors, type Colors } from '@/ui/theme';
 
+type GruposItem =
+  | { kind: 'person'; person: Person }
+  | { kind: 'group'; group: GroupWithMembers }
+  | { kind: 'member'; person: Person };
+
+interface GruposSection {
+  key: 'people' | 'groups' | 'members';
+  data: GruposItem[];
+}
+
 export default function GruposScreen() {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -54,6 +72,24 @@ export default function GruposScreen() {
   const filteredPeople = useMemo(
     () => people.filter((person) => matchesQuery(person.name, personQuery)),
     [people, personQuery]
+  );
+
+  const sections = useMemo<GruposSection[]>(
+    () => [
+      {
+        key: 'people',
+        data: filteredPeople.map((person) => ({ kind: 'person', person })),
+      },
+      {
+        key: 'groups',
+        data: groups.map((group) => ({ kind: 'group', group })),
+      },
+      {
+        key: 'members',
+        data: filteredPeople.map((person) => ({ kind: 'member', person })),
+      },
+    ],
+    [filteredPeople, groups]
   );
 
   const load = useCallback(async () => {
@@ -224,190 +260,233 @@ export default function GruposScreen() {
     );
   }
 
-  return (
-    <Screen bottomInset={false}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <SectionTitle title="Personas" />
-        <TextField
-          autoCapitalize="words"
-          label={editingPersonId ? 'Nombre' : 'Nueva persona'}
-          onChangeText={editingPersonId ? setEditingPersonName : setNewPersonName}
-          onSubmitEditing={editingPersonId ? submitEditPerson : addPerson}
-          placeholder="Nombre"
-          returnKeyType="done"
-          value={editingPersonId ? editingPersonName : newPersonName}
-        />
-        {editingPersonId ? (
-          <>
-            <Button
-              disabled={!editingPersonName.trim()}
-              loading={savingEdit}
-              onPress={submitEditPerson}
-              style={styles.blockButton}
-              title="Guardar cambios"
-            />
-            <Button
-              disabled={savingEdit}
-              onPress={cancelEditPerson}
-              style={styles.blockButton}
-              title="Cancelar"
-              variant="secondary"
-            />
-          </>
-        ) : (
-          <Button
-            disabled={!newPersonName.trim() || savingPerson}
-            loading={savingPerson}
-            onPress={addPerson}
-            style={styles.blockButton}
-            title="Agregar persona"
-            variant="secondary"
+  const renderPerson = (person: Person) => (
+    <View style={styles.personRow}>
+      <Text numberOfLines={1} style={styles.personName}>
+        {person.name}
+      </Text>
+      <View style={styles.rowIcons}>
+        <Pressable hitSlop={8} onPress={() => startEditPerson(person)} style={styles.iconButton}>
+          <Ionicons color={colors.primary} name="create-outline" size={20} />
+        </Pressable>
+        <Pressable
+          hitSlop={8}
+          onPress={() => confirmDeletePerson(person)}
+          style={styles.iconButton}
+        >
+          <Ionicons color={colors.danger} name="trash-outline" size={20} />
+        </Pressable>
+      </View>
+    </View>
+  );
+
+  const renderGroup = (group: GroupWithMembers) => (
+    <Card style={styles.groupCard}>
+      <View style={styles.groupHeader}>
+        <Text numberOfLines={1} style={styles.groupName}>
+          {group.name}
+        </Text>
+        <View style={styles.rowIcons}>
+          <Pressable hitSlop={8} onPress={() => startEditGroup(group)} style={styles.iconButton}>
+            <Ionicons color={colors.primary} name="create-outline" size={20} />
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            onPress={() => confirmDeleteGroup(group)}
+            style={styles.iconButton}
+          >
+            <Ionicons color={colors.danger} name="trash-outline" size={20} />
+          </Pressable>
+        </View>
+      </View>
+      <Text style={styles.groupMembers}>
+        {group.members.length > 0
+          ? group.members.map((member) => member.name).join(', ')
+          : 'Sin integrantes'}
+      </Text>
+    </Card>
+  );
+
+  const renderItem = ({ item }: { item: GruposItem }) => {
+    if (item.kind === 'person') return renderPerson(item.person);
+    if (item.kind === 'group') return renderGroup(item.group);
+    return (
+      <CheckRow
+        checked={
+          editingGroupId
+            ? editingGroupMemberIds.includes(item.person.id)
+            : groupMemberIds.includes(item.person.id)
+        }
+        label={item.person.name}
+        onToggle={() =>
+          editingGroupId ? toggleEditingGroupMember(item.person.id) : toggleMember(item.person.id)
+        }
+      />
+    );
+  };
+
+  const renderSectionHeader = ({ section }: { section: GruposSection }) => {
+    if (section.key === 'groups') {
+      return <SectionTitle style={styles.section} title="Grupos" />;
+    }
+    if (section.key === 'members') {
+      return (
+        <>
+          <SectionTitle
+            style={styles.section}
+            title={editingGroupId ? 'Editar grupo' : 'Nuevo grupo'}
           />
-        )}
-        {people.length === 0 ? (
+          <TextField
+            autoCapitalize="words"
+            label="Nombre del grupo"
+            onChangeText={editingGroupId ? setEditingGroupName : setGroupName}
+            placeholder="Ej: Los pibes"
+            value={editingGroupId ? editingGroupName : groupName}
+          />
+          <Text style={styles.fieldLabel}>Integrantes</Text>
+          {people.length === 0 ? (
+            <Text style={styles.hint}>Primero agregá personas arriba.</Text>
+          ) : filteredPeople.length === 0 ? (
+            <Text style={styles.hint}>No se encontraron personas.</Text>
+          ) : null}
+        </>
+      );
+    }
+    return null;
+  };
+
+  const renderSectionFooter = ({ section }: { section: GruposSection }) => {
+    if (section.key === 'people') {
+      if (people.length === 0) {
+        return (
           <EmptyState
             icon="person-outline"
             message="Cargá a tus amigos para poder usarlos en juntadas y grupos."
             title="Sin personas"
           />
-        ) : (
-          <>
-            <SearchField onChangeText={setPersonQuery} value={personQuery} />
-            {filteredPeople.length === 0 ? (
-              <EmptyState
-                icon="search-outline"
-                message="Probá con otro nombre."
-                title="No se encontraron personas"
-              />
-            ) : (
-              filteredPeople.map((person) => (
-                <View key={person.id} style={styles.personRow}>
-                  <Text numberOfLines={1} style={styles.personName}>
-                    {person.name}
-                  </Text>
-                  <View style={styles.rowIcons}>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => startEditPerson(person)}
-                      style={styles.iconButton}
-                    >
-                      <Ionicons color={colors.primary} name="create-outline" size={20} />
-                    </Pressable>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => confirmDeletePerson(person)}
-                      style={styles.iconButton}
-                    >
-                      <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                    </Pressable>
-                  </View>
-                </View>
-              ))
-            )}
-          </>
-        )}
-
-        <SectionTitle style={styles.section} title="Grupos" />
-        {groups.length === 0 ? (
+        );
+      }
+      if (filteredPeople.length === 0) {
+        return (
+          <EmptyState
+            icon="search-outline"
+            message="Probá con otro nombre."
+            title="No se encontraron personas"
+          />
+        );
+      }
+      return null;
+    }
+    if (section.key === 'groups') {
+      if (groups.length === 0) {
+        return (
           <EmptyState
             icon="people-outline"
             message='Creá grupos frecuentes como "Los pibes" o "Fútbol" para cargarlos en un toque.'
             title="Sin grupos"
           />
-        ) : (
-          groups.map((group) => (
-            <Card key={group.id} style={styles.groupCard}>
-              <View style={styles.groupHeader}>
-                <Text numberOfLines={1} style={styles.groupName}>
-                  {group.name}
-                </Text>
-                <View style={styles.rowIcons}>
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => startEditGroup(group)}
-                    style={styles.iconButton}
-                  >
-                    <Ionicons color={colors.primary} name="create-outline" size={20} />
-                  </Pressable>
-                  <Pressable
-                    hitSlop={8}
-                    onPress={() => confirmDeleteGroup(group)}
-                    style={styles.iconButton}
-                  >
-                    <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                  </Pressable>
-                </View>
-              </View>
-              <Text style={styles.groupMembers}>
-                {group.members.length > 0
-                  ? group.members.map((member) => member.name).join(', ')
-                  : 'Sin integrantes'}
-              </Text>
-            </Card>
-          ))
-        )}
-
-        <SectionTitle style={styles.section} title={editingGroupId ? 'Editar grupo' : 'Nuevo grupo'} />
-        <TextField
-          autoCapitalize="words"
-          label="Nombre del grupo"
-          onChangeText={editingGroupId ? setEditingGroupName : setGroupName}
-          placeholder="Ej: Los pibes"
-          value={editingGroupId ? editingGroupName : groupName}
+        );
+      }
+      return null;
+    }
+    return editingGroupId ? (
+      <>
+        <Button
+          disabled={!editingGroupName.trim() || editingGroupMemberIds.length === 0}
+          loading={savingEdit}
+          onPress={submitEditGroup}
+          style={styles.blockButton}
+          title="Guardar cambios"
         />
-        <Text style={styles.fieldLabel}>Integrantes</Text>
-        {people.length === 0 ? (
-          <Text style={styles.hint}>Primero agregá personas arriba.</Text>
-        ) : filteredPeople.length === 0 ? (
-          <Text style={styles.hint}>No se encontraron personas.</Text>
-        ) : (
-          filteredPeople.map((person) => (
-            <CheckRow
-              checked={
-                editingGroupId
-                  ? editingGroupMemberIds.includes(person.id)
-                  : groupMemberIds.includes(person.id)
-              }
-              key={person.id}
-              label={person.name}
-              onToggle={() =>
-                editingGroupId ? toggleEditingGroupMember(person.id) : toggleMember(person.id)
-              }
-            />
-          ))
-        )}
-        {editingGroupId ? (
+        <Button
+          disabled={savingEdit}
+          onPress={cancelEditGroup}
+          style={styles.blockButton}
+          title="Cancelar"
+          variant="secondary"
+        />
+      </>
+    ) : (
+      <Button
+        disabled={!groupName.trim() || groupMemberIds.length === 0}
+        loading={savingGroup}
+        onPress={submitGroup}
+        style={styles.blockButton}
+        title="Crear grupo"
+      />
+    );
+  };
+
+  return (
+    <Screen bottomInset={false}>
+      <SectionList
+        contentContainerStyle={styles.content}
+        keyExtractor={(item) =>
+          item.kind === 'group'
+            ? `group-${item.group.id}`
+            : `${item.kind}-${item.person.id}`
+        }
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
           <>
-            <Button
-              disabled={!editingGroupName.trim() || editingGroupMemberIds.length === 0}
-              loading={savingEdit}
-              onPress={submitEditGroup}
-              style={styles.blockButton}
-              title="Guardar cambios"
+            <SectionTitle title="Personas" />
+            <TextField
+              autoCapitalize="words"
+              label={editingPersonId ? 'Nombre' : 'Nueva persona'}
+              onChangeText={editingPersonId ? setEditingPersonName : setNewPersonName}
+              onSubmitEditing={editingPersonId ? submitEditPerson : addPerson}
+              placeholder="Nombre"
+              returnKeyType="done"
+              value={editingPersonId ? editingPersonName : newPersonName}
             />
-            <Button
-              disabled={savingEdit}
-              onPress={cancelEditGroup}
-              style={styles.blockButton}
-              title="Cancelar"
-              variant="secondary"
-            />
+            {editingPersonId ? (
+              <>
+                <Button
+                  disabled={!editingPersonName.trim()}
+                  loading={savingEdit}
+                  onPress={submitEditPerson}
+                  style={styles.blockButton}
+                  title="Guardar cambios"
+                />
+                <Button
+                  disabled={savingEdit}
+                  onPress={cancelEditPerson}
+                  style={styles.blockButton}
+                  title="Cancelar"
+                  variant="secondary"
+                />
+              </>
+            ) : (
+              <Button
+                disabled={!newPersonName.trim() || savingPerson}
+                loading={savingPerson}
+                onPress={addPerson}
+                style={styles.blockButton}
+                title="Agregar persona"
+                variant="secondary"
+              />
+            )}
+            {people.length > 0 ? (
+              <SearchField onChangeText={setPersonQuery} value={personQuery} />
+            ) : null}
           </>
-        ) : (
-          <Button
-            disabled={!groupName.trim() || groupMemberIds.length === 0}
-            loading={savingGroup}
-            onPress={submitGroup}
-            style={styles.blockButton}
-            title="Crear grupo"
-          />
-        )}
-      </ScrollView>
+        }
+        renderItem={renderItem}
+        renderSectionFooter={renderSectionFooter}
+        renderSectionHeader={renderSectionHeader}
+        sections={sections}
+        stickySectionHeadersEnabled={false}
+        style={styles.list}
+      />
     </Screen>
   );
 }
 
 const makeStyles = (colors: Colors) => StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   loading: {
     flex: 1,
     alignItems: 'center',

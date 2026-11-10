@@ -26,6 +26,7 @@ import { Card } from '@/ui/components/Card';
 import { Chip } from '@/ui/components/Chip';
 import { SectionTitle } from '@/ui/components/SectionTitle';
 import { TextField } from '@/ui/components/TextField';
+import { lightHaptic, selectionHaptic, successHaptic } from '@/ui/haptics';
 import { fontSize, spacing, useColors, type Colors } from '@/ui/theme';
 
 interface Props {
@@ -80,6 +81,7 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
   const load = useCallback(async () => {
     const result = await listSkullKingEntries(db, match.id);
     setEntries(result);
+    return result;
   }, [db, match.id]);
 
   useFocusEffect(
@@ -102,7 +104,10 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
   useEffect(() => {
     if (complete && status === 'active') {
       finishMatch(db, match.id)
-        .then(() => changeStatus('finished'))
+        .then(() => {
+          changeStatus('finished');
+          successHaptic();
+        })
         .catch(() => undefined);
     }
   }, [complete, status, db, match.id, changeStatus]);
@@ -159,7 +164,11 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
     }
     try {
       await saveSkullKingRound(db, match.id, roundEntries);
-      await load();
+      const updated = await load();
+      const completeNow = updated.length >= SKULL_KING_TOTAL_ROUNDS * playerIds.length;
+      if (!completeNow) {
+        lightHaptic();
+      }
     } catch {
       Alert.alert('Error', 'No se pudo guardar la ronda.');
     }
@@ -183,6 +192,7 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
             await reopenMatch(db, match.id);
             changeStatus('active');
           }
+          selectionHaptic();
         },
       },
     ]);
@@ -190,7 +200,12 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
 
   const toggleStatus = () => {
     if (status === 'finished') {
-      reopenMatch(db, match.id).then(() => changeStatus('active')).catch(() => undefined);
+      reopenMatch(db, match.id)
+        .then(() => {
+          changeStatus('active');
+          selectionHaptic();
+        })
+        .catch(() => undefined);
     } else {
       Alert.alert('Finalizar partida', '¿Cerrar la partida ahora?', [
         { text: 'Cancelar', style: 'cancel' },
@@ -199,6 +214,7 @@ export function SkullKingScorer({ match, nameOf, onStatusChange }: Props) {
           onPress: async () => {
             await finishMatch(db, match.id);
             changeStatus('finished');
+            successHaptic();
           },
         },
       ]);

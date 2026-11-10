@@ -11,7 +11,7 @@ interface Migration {
   sql: string;
 }
 
-const MIGRATIONS: Migration[] = [
+export const MIGRATIONS: Migration[] = [
   {
     version: 1,
     sql: `

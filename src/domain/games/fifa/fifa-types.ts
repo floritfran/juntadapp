@@ -49,3 +49,14 @@ export interface FifaCupResultPlan {
   winnerId: PersonId;
   championId: PersonId | null;
 }
+
+export interface FifaUndoAdvance {
+  round: number;
+  slot: number;
+  position: 1 | 2;
+}
+
+export interface FifaUndoPlan {
+  gameId: string;
+  clearAdvance: FifaUndoAdvance | null;
+}

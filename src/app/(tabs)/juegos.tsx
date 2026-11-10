@@ -1,4 +1,4 @@
-import { ScrollView, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import { CASUAL_GET_TOGETHER_ID } from '@/infrastructure/persistence/migrations';
 import { Screen } from '@/ui/components/Screen';
@@ -8,9 +8,11 @@ import { spacing } from '@/ui/theme';
 export default function JuegosScreen() {
   return (
     <Screen bottomInset={false}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <GamesSection casual getTogetherId={CASUAL_GET_TOGETHER_ID} />
-      </ScrollView>
+      <GamesSection
+        casual
+        contentContainerStyle={styles.content}
+        getTogetherId={CASUAL_GET_TOGETHER_ID}
+      />
     </Screen>
   );
 }
