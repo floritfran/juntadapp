@@ -6,6 +6,7 @@ import { useSQLiteContext } from 'expo-sqlite';
 
 import { matchesQuery } from '@/domain/common/text-search';
 import { GroupId } from '@/domain/groups/group-types';
+import { findPersonWithName } from '@/domain/people/person-name';
 import { Person, PersonId } from '@/domain/people/person-types';
 import {
   GroupWithMembers,
@@ -40,6 +41,7 @@ export default function GruposScreen() {
   const [newPersonName, setNewPersonName] = useState('');
   const [groupName, setGroupName] = useState('');
   const [groupMemberIds, setGroupMemberIds] = useState<string[]>([]);
+  const [savingPerson, setSavingPerson] = useState(false);
   const [savingGroup, setSavingGroup] = useState(false);
   const [editingPersonId, setEditingPersonId] = useState<PersonId | null>(null);
   const [editingPersonName, setEditingPersonName] = useState('');
@@ -68,14 +70,23 @@ export default function GruposScreen() {
   );
 
   const addPerson = async () => {
+    if (savingPerson) return;
     const name = newPersonName.trim();
     if (!name) return;
+    const duplicate = findPersonWithName(people, name);
+    if (duplicate) {
+      Alert.alert('Persona duplicada', `Ya existe "${duplicate.name}".`);
+      return;
+    }
+    setSavingPerson(true);
     try {
       await createPerson(db, name);
       setNewPersonName('');
       await load();
     } catch {
       Alert.alert('Error', 'No se pudo agregar la persona.');
+    } finally {
+      setSavingPerson(false);
     }
   };
 
@@ -134,6 +145,11 @@ export default function GruposScreen() {
   const submitEditPerson = async () => {
     const name = editingPersonName.trim();
     if (!name || !editingPersonId) return;
+    const duplicate = findPersonWithName(people, name, editingPersonId);
+    if (duplicate) {
+      Alert.alert('Persona duplicada', `Ya existe "${duplicate.name}".`);
+      return;
+    }
     setSavingEdit(true);
     try {
       await updatePerson(db, editingPersonId, name);
@@ -240,7 +256,8 @@ export default function GruposScreen() {
           </>
         ) : (
           <Button
-            disabled={!newPersonName.trim()}
+            disabled={!newPersonName.trim() || savingPerson}
+            loading={savingPerson}
             onPress={addPerson}
             style={styles.blockButton}
             title="Agregar persona"
