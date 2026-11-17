@@ -21,7 +21,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Juntadas',
-          tabBarIcon: ({ color, size }) => <Ionicons color={color} name="home-outline" size={size} />,
+          tabBarIcon: ({ color, size }) => <Ionicons color={typeof color === 'number' ? undefined : color ?? undefined} name="home-outline" size={size} />,
         }}
       />
       <Tabs.Screen
@@ -29,7 +29,7 @@ export default function TabLayout() {
         options={{
           title: 'Juegos',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons color={color} name="game-controller-outline" size={size} />
+            <Ionicons color={typeof color === 'number' ? undefined : color ?? undefined} name="game-controller-outline" size={size} />
           ),
         }}
       />
@@ -37,7 +37,7 @@ export default function TabLayout() {
         name="grupos"
         options={{
           title: 'Grupos',
-          tabBarIcon: ({ color, size }) => <Ionicons color={color} name="people-outline" size={size} />,
+          tabBarIcon: ({ color, size }) => <Ionicons color={typeof color === 'number' ? undefined : color ?? undefined} name="people-outline" size={size} />,
         }}
       />
     </Tabs>

@@ -4,7 +4,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 
 ## Stack
 
-- Expo SDK 57 (React Native, TypeScript strict)
+- Expo SDK 58 (React Native, TypeScript strict)
 - Expo Router (file-based navigation, typed routes)
 - expo-sqlite (local database with versioned migrations)
 - expo-crypto (UUIDs), dayjs (dates)
@@ -15,6 +15,8 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - People and friend groups management (create, edit name/members, soft delete)
 - Search people by name (case- and accent-insensitive) in every people list, with a clear (X) button in the search field
 - Create a juntada with participants (manual or from a saved group)
+- Delete a juntada with confirmation; its expenses, registered payments and all played games are removed with it (people and groups are kept)
+- Edit a juntada's name and participants; choose whether existing expenses are re-split among the new participants (not available once a payment has been registered). Unsaved edits are confirmed before leaving. People who paid an expense cannot be removed from the participant list; people who only owe a share can, and balances are recalculated when existing expenses are updated
 - Record expenses: payer, amount, participants
 - Edit an existing expense; settlements and totals recompute automatically
 - Settle a debt: register a payment between two people that cancels the pending transfer

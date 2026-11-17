@@ -136,7 +136,7 @@ export function ExpenseForm({
             <Text style={styles.hint}>
               La división se reparte en partes iguales entre los participantes.
             </Text>
-          ) : null
+          ) : undefined
         }
         ListHeaderComponent={
           <>

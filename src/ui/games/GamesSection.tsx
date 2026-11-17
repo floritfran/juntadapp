@@ -116,7 +116,7 @@ export function GamesSection({
           title="Sin partidas todavía"
         />
       }
-      ListFooterComponent={footer}
+      ListFooterComponent={footer ?? undefined}
       ListHeaderComponent={
         <>
           {header}
