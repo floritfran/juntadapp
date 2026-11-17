@@ -46,6 +46,19 @@ export async function listSettlements(
   return rows.map(rowToSettlement);
 }
 
+export async function hasSettlements(
+  db: SQLiteDatabase,
+  getTogetherId: GetTogetherId
+): Promise<boolean> {
+  const row = await db.getFirstAsync<{ present: number }>(
+    `SELECT 1 AS present FROM settlements
+      WHERE get_together_id = ? AND deleted_at IS NULL
+      LIMIT 1`,
+    getTogetherId
+  );
+  return row != null;
+}
+
 export async function createSettlements(
   db: SQLiteDatabase,
   getTogetherId: GetTogetherId,

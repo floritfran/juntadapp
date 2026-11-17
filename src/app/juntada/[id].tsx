@@ -24,7 +24,7 @@ import { buildSettlementSummaryText } from '@/domain/expenses/settlement-summary
 import { GetTogether } from '@/domain/get-togethers/get-together-types';
 import { Person, PersonId } from '@/domain/people/person-types';
 import { listExpenses, softDeleteExpense } from '@/infrastructure/persistence/expenses-repository';
-import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
+import { deleteGetTogether, getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { listAllPeople } from '@/infrastructure/persistence/people-repository';
 import {
   createSettlements,
@@ -58,6 +58,8 @@ export default function JuntadaDetailScreen() {
   const [tab, setTab] = useState<DetailTab>('expenses');
   const [settlingAll, setSettlingAll] = useState(false);
   const settlingAllRef = useRef(false);
+  const [deleting, setDeleting] = useState(false);
+  const deletingRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -135,6 +137,34 @@ export default function JuntadaDetailScreen() {
         },
       ]
     );
+
+  const confirmDeleteGetTogether = () => {
+    if (!getTogether || deletingRef.current) return;
+    Alert.alert(
+      'Eliminar juntada',
+      `¿Eliminar "${getTogether.name}"? Se borrarán también sus gastos, pagos y juegos. Esta acción no se puede deshacer.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            if (deletingRef.current) return;
+            deletingRef.current = true;
+            setDeleting(true);
+            try {
+              await deleteGetTogether(db, getTogether.id);
+              router.back();
+            } catch {
+              deletingRef.current = false;
+              setDeleting(false);
+              Alert.alert('Error', 'No se pudo eliminar la juntada.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const settleTransfer = (transfer: Transfer) =>
     router.push({
@@ -235,6 +265,23 @@ export default function JuntadaDetailScreen() {
               <Text style={styles.badgeText}>Cerrada</Text>
             </View>
           ) : null}
+          <Pressable
+            hitSlop={8}
+            onPress={() =>
+              router.push({ pathname: '/juntada/editar', params: { id: getTogether.id } })
+            }
+            style={styles.iconButton}
+          >
+            <Ionicons color={colors.primary} name="pencil-outline" size={20} />
+          </Pressable>
+          <Pressable
+            disabled={deleting}
+            hitSlop={8}
+            onPress={confirmDeleteGetTogether}
+            style={styles.iconButton}
+          >
+            <Ionicons color={colors.danger} name="trash-outline" size={20} />
+          </Pressable>
         </View>
         <Text style={styles.meta}>
           {formatDate(getTogether.date)} ·{' '}

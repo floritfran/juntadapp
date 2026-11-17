@@ -91,6 +91,59 @@ export async function getGetTogether(
   );
 }
 
+export async function updateGetTogether(
+  db: SQLiteDatabase,
+  id: GetTogetherId,
+  input: { name: string; participantIds: PersonId[]; updateExpenses: boolean }
+): Promise<void> {
+  const now = Date.now();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      'UPDATE get_togethers SET name = ?, updated_at = ? WHERE id = ?',
+      input.name.trim(),
+      now,
+      id
+    );
+    await db.runAsync('DELETE FROM get_together_people WHERE get_together_id = ?', id);
+    for (let position = 0; position < input.participantIds.length; position++) {
+      await db.runAsync(
+        'INSERT INTO get_together_people (get_together_id, person_id, position) VALUES (?, ?, ?)',
+        id,
+        input.participantIds[position],
+        position
+      );
+    }
+    if (!input.updateExpenses) return;
+    const expenses = await db.getAllAsync<{ id: string }>(
+      'SELECT id FROM expenses WHERE get_together_id = ? AND deleted_at IS NULL',
+      id
+    );
+    for (const expense of expenses) {
+      await db.runAsync('DELETE FROM expense_participants WHERE expense_id = ?', expense.id);
+      for (let position = 0; position < input.participantIds.length; position++) {
+        await db.runAsync(
+          'INSERT INTO expense_participants (expense_id, person_id, position) VALUES (?, ?, ?)',
+          expense.id,
+          input.participantIds[position],
+          position
+        );
+      }
+      await db.runAsync('UPDATE expenses SET updated_at = ? WHERE id = ?', now, expense.id);
+    }
+  });
+}
+
+export async function deleteGetTogether(
+  db: SQLiteDatabase,
+  id: GetTogetherId
+): Promise<void> {
+  await db.runAsync(
+    'DELETE FROM get_togethers WHERE id = ? AND id <> ?',
+    id,
+    CASUAL_GET_TOGETHER_ID
+  );
+}
+
 export async function createGetTogether(
   db: SQLiteDatabase,
   input: { name: string; date: Date; participantIds: PersonId[] }

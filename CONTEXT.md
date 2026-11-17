@@ -17,7 +17,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 
 ## Tech Stack
 
-- Expo SDK 57, React Native 0.86, TypeScript (strict)
+- Expo SDK 58, React Native 0.88, TypeScript (strict)
 - Expo Router (file-based routing, typed routes enabled) - routes in `src/app`
 - expo-sqlite (`SQLiteProvider` + `onInit` migration hook), expo-crypto (UUIDs), expo-haptics (selection/light/success feedback), dayjs (dates)
 - Jest + jest-expo (`jest.config.js`, transform via babel-preset-expo). Do NOT switch to ts-jest: it was tried and broke on React Native imports; the jest-expo preset is the working setup.
@@ -53,17 +53,22 @@ State of each feature and the exact files that implement it. Start here to know 
 - UI: `src/app/(tabs)/grupos.tsx` — people list (tap pencil to edit inline: an edit form appears at the top of the screen driven by local `editId` state; confirm before discarding edits), groups list with member checkbox picker, both lists filtered by the same `SearchField` query.
 - Gotchas: editing a group replaces the full member selection (checkboxes start pre-checked from current members); destructive deletes use `Alert.alert` confirmation.
 
-### 2. Juntadas (create + list + detail)
+### 2. Juntadas (create + list + detail + edit)
 
 - Create: name, today's date only, participants (manual multi-select or load from a group, then adjustable).
-- Domain: `src/domain/get-togethers/get-together-types.ts`.
-- Repo: `get-togethers-repository.ts` (`createGetTogether` + participant snapshot rows in `get_together_people`, `listGetTogethers`, `getGetTogether`...).
+- Edit: name and participants (via the pencil in the detail header); date is still read-only. Reuses the same picker form as create. When participants change and there are expenses, the user chooses whether to rewrite every active expense's participants or apply the change only to new expenses. If any active settlement exists, rewriting existing expenses is blocked (an alert explains the change will only apply to new expenses). Unsaved edits are confirmed before dismissal.
+- Only expense PAYERS are locked in the edit picker: their `CheckRow` is disabled (lock icon) and group chips / submit cannot drop them. `findExpensePayers` in `get-together-edits.ts` builds the set from active expenses; `GetTogetherForm` takes it as `lockedParticipantIds` (empty for create). Deleted expenses do not lock anyone. People who only owe a share (expense participants, not payers) can be removed; the edit prompt's "Actualizar gastos" rewrites them out of active expenses so balances/transfers recalculate.
+- Domain: `src/domain/get-togethers/get-together-types.ts`, `get-together-edits.ts` (`sameParticipants`, `reassignExpensesToParticipants`).
+- Repo: `get-togethers-repository.ts` (`createGetTogether`, `updateGetTogether` with optional expense participant rewrite in one transaction, `listGetTogethers`, `getGetTogether`...). `settlements-repository.ts` exposes `hasSettlements`.
 - UI:
   - `src/app/(tabs)/index.tsx` — list: name, date, participant count, total spent; create button opens modal.
-  - `src/app/juntada/nueva.tsx` — modal: group chip to preload selection, people checkboxes with SearchField, EmptyState on no matches; selection preserved when filtering.
-  - `src/app/juntada/[id].tsx` — detail: header with balances/transfers (Liquidación section: "Saldar" per transfer opens pago-nuevo prefilled, "Saldar todo" registers every pending transfer in one transaction, "Compartir" shares summary text), segmented control Gastos | Juegos. Computes everything at render from expenses + settlements via `expense-calculator` (no stored balances).
-- Participants are a SNAPSHOT: later changes to people/groups do not affect existing juntadas (decided).
-- NOT implemented: edit juntada (name/date/participants), date picker (always today), close/reopen (`status` column exists, always `active`). Open product decision.
+  - `src/ui/get-togethers/GetTogetherForm.tsx` — shared form for create/edit: group chips, people checkboxes with SearchField, inline new person, dirty reporting; both screens own loading and saving. `useDiscardGuard.ts` uses Expo Router's `usePreventRemove` to confirm discarding edits.
+  - `src/app/juntada/nueva.tsx` — create modal wrapper around `GetTogetherForm`.
+  - `src/app/juntada/editar.tsx` — edit modal (`?id=`): loads the juntada, people, groups, expense count and payment flag, asks about existing expenses, then saves.
+  - `src/app/juntada/[id].tsx` — detail: header with name, participants, edit pencil, delete trash, balances/transfers (Liquidación section: "Saldar" per transfer opens pago-nuevo prefilled, "Saldar todo" registers every pending transfer in one transaction, "Compartir" shares summary text), segmented control Gastos | Juegos. Computes everything at render from expenses + settlements via `expense-calculator` (no stored balances).
+- Delete: trash icon in the detail header, `Alert.alert` confirmation (explicitly mentions expenses, payments and games are removed and it cannot be undone). `deleteGetTogether(db, id)` hard-deletes the row and relies on FK `ON DELETE CASCADE` to remove `get_together_people`, expenses + `expense_participants`, settlements and matches with all their game tables. The hidden `casual` row is protected by an `id <>` guard in the same SQL. `router.back()` after success.
+- Participants are a SNAPSHOT: later changes to people/groups do not affect existing juntadas (decided). Editing a juntada replaces the whole participant list.
+- NOT implemented: date picker (always today), close/reopen (`status` column exists, always `active`). Open product decision.
 
 ### 3. Expenses (complete)
 
@@ -132,13 +137,13 @@ State of each feature and the exact files that implement it. Start here to know 
 ```
 src/app            - Expo Router screens (every file is a route)
   /(tabs)/         - index (juntadas), juegos (casual scorekeeper), grupos (people+groups), _layout
-  /juntada/        - nueva, [id], gasto-nuevo, gasto-editar, pago-nuevo, juego-nuevo, partida
+  /juntada/        - nueva, editar, [id], gasto-nuevo, gasto-editar, pago-nuevo, juego-nuevo, partida
   /juegos/         - nueva (casual match setup, modal)
 src/domain         - pure business logic
   /common/         - Money.ts (formatMoneyInt), text-search.ts (normalizeForSearch/matchesQuery/compareByName)
   /expenses/       - expense-calculator, expense-types, settlement-summary
   /games/          - game-types + truco/ generala/ skull-king/ fifa/ generic/ (each: scorer + types)
-  /get-togethers/  - get-together-types
+  /get-togethers/  - get-together-types, get-together-edits (participant rewrite helpers)
   /groups/         - group-types
   /people/         - person-types
 src/infrastructure
@@ -148,10 +153,11 @@ src/infrastructure
 src/ui
   /components/     - Button, Card, CheckRow, Chip, EmptyState, Screen, SearchField, SectionTitle, TextField
   /expenses/       - ExpenseForm, SettlementForm (reusable forms)
+  /get-togethers/  - GetTogetherForm (create + edit), useDiscardGuard
   /games/          - GamesSection + one scorer per game
   format.ts        - UI money/date formatting (delegates money to domain)
   theme.tsx        - palettes + scales + ThemeProvider
-tests/domain       - unit tests mirroring src/domain (common/, expenses/, games/<game>/)
+tests/domain       - unit tests mirroring src/domain (common/, expenses/, get-togethers/, games/<game>/)
 .github/workflows  - tests.yml (CI)
 CONTEXT.md         - this file; README.md - developer overview; diseño.md - original PRD (Spanish)
 ```
@@ -223,14 +229,16 @@ v8 (casual games):
 
 - Money stored as integer ARS (no cents)
 - Equal split: remainder distributed to the first participants (index 0..r-1)
-- Soft delete for people, groups, expenses and settlements (preserve history); games hard-delete
+- Soft delete for people, groups, expenses and settlements (preserve history); games and whole juntadas hard-delete. Deleting a juntada cascades to all its expenses, settlements and matches (FK `ON DELETE CASCADE`); people/groups survive
 - Soft-deleted people never appear as selectable players (pickers use `listPeople`); `listAllPeople` is only for rendering historical match names
 - Active person names are unique, compared with `findPersonWithName` (trim + `normalizeForSearch`)
 - Editing a group rewrites `group_members` (delete + reinsert with `position`) inside a transaction; soft-deleted members are kept in the group but not offered as options
 - Applying a group chip (new juntada or casual match) only selects its active members; soft-deleted members are ignored
 - Settlements (registered payments) count as paid for the payer and owed by the receiver, so they cancel pending transfers
 - Participants snapshot per juntada (history does not break if people change)
-- Editing or closing a juntada: NOT implemented yet (open product decision)
+- Editing a juntada rewrites `get_together_people` inside a transaction. With `updateExpenses: true`, every active expense's `expense_participants` is rewritten to the new list, so balances/transfers are derived again at render; the payer of each expense is untouched. With `false`, expenses keep their participant snapshot. Rewriting existing expenses is unavailable once the juntada has an active settlement.
+- A person who paid an active expense cannot be removed from the juntada; the edit form disables their checkbox and keeps them selected even when a group chip is applied. A person who only owes a share can be removed; rewriting existing expenses drops their share and recalculates balances.
+- Closing a juntada: NOT implemented yet (open product decision)
 - Casual matches belong to the hidden `casual` get-together; they finish and delete like any other match (no special discard flow)
 
 ## Expense Calculation
@@ -243,6 +251,14 @@ All in `src/domain/expenses/expense-calculator.ts`:
 - `minimizeTransfers(expenses, settlements)`: default mode
 - `buildSettlementInputs(transfers)`: maps the pending transfers to settlement rows for the bulk "Saldar todo" action
 - `buildSettlementSummaryText(summary)` in `settlement-summary.ts`: plain-text summary (title + total + one line per transfer, or "todo saldado"); money formatted by `formatMoneyInt` in `domain/common/Money.ts`, the single source of truth behind `ui/format.ts` `formatMoney`
+
+## Juntada participant changes
+
+- `reassignExpensesToParticipants(expenses, participantIds)` in `src/domain/get-togethers/get-together-edits.ts` replaces the participant snapshot of every active expense; deleted expenses are ignored and original expense objects are not mutated.
+- `updateGetTogether(db, id, { name, participantIds, updateExpenses })` rewrites `get_together_people` and, when requested, each active expense's `expense_participants` in one transaction (also bumping `expenses.updated_at`). Payers are never changed.
+- Balances and transfers are never stored: the detail screen recomputes them from expenses + settlements after the edit. Tests in `tests/domain/get-togethers/get-together-edits.test.ts` cover balances and transfers for added/removed participants.
+- The edit UI asks whether to rewrite existing expenses only when participants changed and there are expenses. If `hasSettlements(db, id)` is true, that option is unavailable because registered payments would no longer match the recalculated balances.
+- `findExpensePayers(expenses)` returns the `Set<PersonId>` of payers across active expenses; `editar.tsx` passes it to `GetTogetherForm.lockedParticipantIds` so payers cannot be unchecked. Submit also re-checks the set defensively. Debtors are not locked: removing one plus `updateExpenses: true` updates balances/transfers, already covered by the "recalculates balances when a participant is removed" test.
 
 ## Debt Minimization Algorithm
 
@@ -276,6 +292,7 @@ Greedy: repeatedly match the largest creditor with the largest debtor until clea
 └── grupos  - Personas y grupos
 Stack (root)
 ├── juntada/nueva        - create juntada (modal)
+├── juntada/editar       - edit juntada name/participants (modal, ?id=)
 ├── juegos/nueva         - create casual match (modal, hidden casual get-together)
 ├── juntada/gasto-nuevo  - add expense (modal, ?id= getTogether)
 ├── juntada/gasto-editar - edit expense (modal, ?id=, ?expenseId=)
@@ -295,7 +312,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 ## Persistence
 
 - `expo-sqlite`, database `juntadapp.db`, WAL mode, foreign keys ON (set inside `migrateDatabase`).
-- Migrations: `src/infrastructure/persistence/migrations.ts`, versioned with `PRAGMA user_version`.
+- Migrations: `src/infrastructure/persistence/migrations.ts`, versioned with `PRAGMA user_version`. Repository-level cascade behavior is tested against a real in-memory `node:sqlite` DB in `tests/infrastructure/persistence/get-togethers-repository.test.ts`.
 - To add a migration: append `{ version: N + 1, sql }` to `MIGRATIONS`. Never edit an applied migration. `tests/infrastructure/persistence/migrations.test.ts` runs the real migrations against an in-memory `node:sqlite` database (fresh DB, incremental upgrade and idempotency), so extend it when adding a migration.
 - Repositories take the `SQLiteDatabase` as first argument (obtained in screens with `useSQLiteContext()`).
 
@@ -309,7 +326,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 ## Patterns (follow when adding features)
 
 - Reusable forms: extract to `src/ui/<area>/` and receive props (see `ExpenseForm`/`SettlementForm`/`NewMatchForm`); screens own loading/saving.
-- Edit flows: modal route for editing money records (`gasto-editar`); inline edit state inside the list screen for lightweight entities (people/groups in `grupos.tsx`).
+- Edit flows: modal route for editing money records (`gasto-editar`) and juntadas (`editar`); inline edit state inside the list screen for lightweight entities (people/groups in `grupos.tsx`). Modal forms that can be dirtied report it through `onDirtyChange` and use `useDiscardGuard` (Expo Router `usePreventRemove`) to confirm dismissal; once the save succeeds, clear `dirty` and call the guard's `disable` before `router.back()` so navigation is not blocked.
 - Destructive actions: always `Alert.alert` confirmation.
 - Reload after mutation: call the local `load()` at the end of the mutation (no cache invalidation layer).
 - Searchable lists: `SearchField` + `matchesQuery` + local `query` state + `EmptyState` when filtered empty.
@@ -335,7 +352,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 ## Known Limitations
 
 - Juntada date is always today (no date picker yet)
-- Cannot edit a juntada or its participants (delete + re-create only)
+- Cannot edit a juntada's date (always today; the detail screen shows the stored date read-only)
 - Cannot close/reopen a juntada; status column exists but is always `active`
 - Web not configured or tested
 - Match players/teams cannot be edited after creation
@@ -347,7 +364,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 ## Future Features (prioritized)
 
 1. Close/reopen juntadas (status column ready; enables history/read-only mode)
-2. Date picker + edit juntada (name/date/participants)
+2. Date picker for juntadas (edit name/participants is already implemented)
 3. Game statistics (wins/rankings — data already persisted; domain-only queries + tests)
 4. Unequal splits (percentages / exact amounts; touches expense-calculator + ExpenseForm)
 5. Extend WhatsApp summary with expenses detail and/or game results
@@ -389,25 +406,31 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 
 - `CONTEXT.md` - this file (AI-facing project context)
 - `README.md` - developer-facing overview
+- `src/ui/get-togethers/GetTogetherForm.tsx` - shared create/edit form for juntada name + participants
+- `src/domain/get-togethers/get-together-edits.ts` - participant rewrite + change detection helpers
 - `diseño.md` - original product requirements (Spanish)
 - `src/domain/expenses/expense-calculator.ts` - splits, balances, transfers
 - `src/domain/common/text-search.ts` - search normalization + matchesQuery
 - `src/infrastructure/persistence/migrations.ts` - schema versions v1–v8 + `CASUAL_GET_TOGETHER_ID`
 - `src/ui/games/NewMatchForm.tsx` - reusable match setup (juntada + casual flows)
 - `src/app/_layout.tsx` - root layout (SQLiteProvider + ThemeProvider + Stack)
-- `src/app/juntada/[id].tsx` - juntada detail (Liquidación + Gastos | Juegos)
+- `src/app/juntada/[id].tsx` - juntada detail (Liquidación + Gastos | Juegos, edit + delete header)
 - `src/ui/theme.tsx` - palettes, spacing scale, ThemeProvider + useColors
 - `.github/workflows/tests.yml` - CI
 
 ## Current Project Status
 
-- Phase 0 setup complete (Expo SDK 57, deps, jest via jest-expo, eslint, CI)
+- Phase 0 setup complete (Expo SDK 58, deps, jest via jest-expo, eslint, CI)
 - Expense domain + tests, settlements + debt minimization + share summary + "Saldar todo" bulk payments
 - SQLite schema/migrations v1–v5 + all repositories
-- Full UI: juntadas list/create/detail, expenses create/edit/delete, payments, people/groups with inline edit, search everywhere
+- Full UI: juntadas list/create/edit/detail, expenses create/edit/delete, payments, people/groups with inline edit, search everywhere
 - Games module: Truco, Generala, Skull King, FIFA (Liga infinita / Copa), Generic (domain + tests + repositories + scorers + match list)
 - Casual games tab: play any game without a juntada; finish like juntadas and delete with the trash icon
 - Light/dark theme follows the device color scheme
-- All checks green: `npm test` (125 tests), `npm run lint`, `npm run typecheck`
+- All checks green: `npm test` (130 tests), `npm run lint`, `npm run typecheck`
+
+- Juntada edit: name + participants, prompts to rewrite existing expenses (blocked once a payment is registered), discard confirmation, domain tests for balance recalculation
+- Only expense payers are locked in the participant picker; debtors can be removed and a domain test covers the balance recalculation
+- Juntada delete cascades to expenses, payments and every game table (infrastructure test in `tests/infrastructure/persistence/get-togethers-repository.test.ts`)
 
 Next steps (see Future Features): close/reopen juntadas + date picker, then game statistics.
