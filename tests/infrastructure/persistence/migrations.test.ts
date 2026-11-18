@@ -80,12 +80,12 @@ function countCasualGetTogethers(sqlite: DatabaseSync): number {
 }
 
 describe('database migrations', () => {
-  it('migrates an empty database to version 8 with the full schema', async () => {
+  it('migrates an empty database to version 9 with the full schema', async () => {
     const { sqlite, db } = openMemoryDatabase();
 
     await migrateDatabase(db);
 
-    expect(userVersion(sqlite)).toBe(8);
+    expect(userVersion(sqlite)).toBe(9);
     expect(tableNames(sqlite)).toEqual(EXPECTED_TABLES);
     expect(indexNames(sqlite)).toEqual(EXPECTED_INDEXES);
 
@@ -113,6 +113,8 @@ describe('database migrations', () => {
       'updated_at',
       'deleted_at',
     ]);
+    expect(columnNames(sqlite, 'expenses')).toContain('split_mode');
+    expect(columnNames(sqlite, 'expense_participants')).toContain('split_value');
 
     const casual = sqlite
       .prepare('SELECT id, name, status FROM get_togethers WHERE id = ?')
@@ -120,7 +122,7 @@ describe('database migrations', () => {
     expect(casual).toEqual({ id: CASUAL_GET_TOGETHER_ID, name: 'Casual', status: 'closed' });
   });
 
-  it('upgrades a version 6 database incrementally to version 8', async () => {
+  it('upgrades a version 6 database incrementally to version 9', async () => {
     const { sqlite, db } = openMemoryDatabase();
 
     for (const migration of MIGRATIONS) {
@@ -135,8 +137,9 @@ describe('database migrations', () => {
 
     await migrateDatabase(db);
 
-    expect(userVersion(sqlite)).toBe(8);
+    expect(userVersion(sqlite)).toBe(9);
     expect(columnNames(sqlite, 'fifa_tournaments')).toContain('matches_per_opponent');
+    expect(columnNames(sqlite, 'expenses')).toContain('split_mode');
     expect(countCasualGetTogethers(sqlite)).toBe(1);
   });
 
@@ -146,7 +149,7 @@ describe('database migrations', () => {
     await migrateDatabase(db);
     await migrateDatabase(db);
 
-    expect(userVersion(sqlite)).toBe(8);
+    expect(userVersion(sqlite)).toBe(9);
     expect(countCasualGetTogethers(sqlite)).toBe(1);
   });
 });

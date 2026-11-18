@@ -9,6 +9,10 @@ export type ExpenseId = string;
 
 export type SettlementId = string;
 
+export type SplitMode = 'equal' | 'exact' | 'percentage';
+
+export type SplitValues = Record<PersonId, number>;
+
 export interface Expense {
   id: ExpenseId;
   getTogetherId: GetTogetherId;
@@ -16,6 +20,8 @@ export interface Expense {
   description: string;
   amountInt: MoneyInt;
   participantIds: PersonId[];
+  splitMode?: SplitMode | null;
+  splitValues?: SplitValues | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date | null;

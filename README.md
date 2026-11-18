@@ -9,6 +9,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - expo-sqlite (local database with versioned migrations)
 - expo-crypto (UUIDs), dayjs (dates)
 - Jest + jest-expo (babel-preset-expo transform; no ts-jest), ESLint (`eslint-config-expo`)
+- No state/form/schema library: forms use local React state and explicit validation (`zod` remains only transitively via the ESLint plugin, not in app code)
 
 ## Features (so far)
 
@@ -18,12 +19,12 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Search juntadas by name and filter them by any month/year and participating friends (searchable list; all selected participants must be in the juntada)
 - Close a juntada when the meetup is over and reopen it later; closed juntadas are read-only (no new or edited expenses, payments or matches)
 - Delete a juntada with confirmation; its expenses, registered payments and all played games are removed with it (people and groups are kept)
-- Edit a juntada's name and participants; choose whether existing expenses are re-split among the new participants (not available once a payment has been registered). Unsaved edits are confirmed before leaving. People who paid an expense cannot be removed from the participant list; people who only owe a share can, and balances are recalculated when existing expenses are updated
-- Record expenses: payer, amount, participants
+- Edit a juntada's name and participants; choose whether existing expenses are re-split equally among the new participants (custom exact/percentage splits are reset; not available once a payment has been registered). Unsaved edits are confirmed before leaving. People who paid an expense cannot be removed from the participant list; people who only owe a share can, and balances are recalculated when existing expenses are updated
+- Record expenses: payer, amount, participants and split mode (equal, exact amounts or percentages)
 - Edit an existing expense; settlements and totals recompute automatically
 - Settle a debt: register a payment between two people that cancels the pending transfer
 - Settle every pending transfer at once with a single confirmation ("Saldar todo")
-- Equal split with deterministic integer remainder
+- Split expenses equally (deterministic integer remainder), by exact amounts or by percentages (0–100% with two decimals); exact totals and 100% are validated, and percentage shares round deterministically so they always add up to the expense total
 - Settlement: direct payments or debt minimization (default)
 - Share the settlement summary (total + pending transfers) as plain text to WhatsApp or any app
 - Juntadas list with date, participants, total spent and a "Cerrada" badge for closed ones

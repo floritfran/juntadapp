@@ -23,7 +23,7 @@ JuntadApp - Mobile app to organize meetups (juntadas). Focus: split expenses and
 - Jest + jest-expo (`jest.config.js`, transform via babel-preset-expo). Do NOT switch to ts-jest: it was tried and broke on React Native imports; the jest-expo preset is the working setup.
 - ESLint with `eslint-config-expo`
 - CI: GitHub Actions (`.github/workflows/tests.yml`) runs `npm run typecheck`, `npm run lint`, `npm test` on every push/PR to `master`
-- Installed but not used yet: Zustand, zod, react-hook-form (reserved for real shared state / form validation needs; do not add a store or validation lib "just in case"), expo-blur
+- No state-management, form-library or schema-validation dependency: screens/forms use local React state plus explicit validation; do not add one "just in case". `expo-blur`, `zustand`, `react-hook-form` and `@hookform/resolvers` were removed. `zod` remains only as a transitive dev dependency of `eslint-plugin-react-hooks`; it is not imported by app code or tests.
 
 ## Architecture
 
@@ -74,10 +74,10 @@ State of each feature and the exact files that implement it. Start here to know 
 
 ### 3. Expenses (complete)
 
-- Create/edit/soft delete; equal split; payer + subset of participants.
-- Domain: `src/domain/expenses/expense-types.ts` + `expense-calculator.ts` (see Expense Calculation section).
-- Repos: `expenses-repository.ts` (`createExpense` + `expense_participants`, `listExpenses`, `updateExpense` which rewrites participants, `deleteExpense` soft).
-- UI: `src/ui/expenses/ExpenseForm.tsx` is a REUSABLE form (description, amount, payer chip, participant checkboxes, validation, SearchField) used by both `src/app/juntada/gasto-nuevo.tsx` (modal `?id=`) and `src/app/juntada/gasto-editar.tsx` (modal `?id=&expenseId=`). Expense list + edit/delete actions live in `src/app/juntada/[id].tsx` under the Gastos segment.
+- Create/edit/soft delete; three split modes: equal (default), exact amounts and percentages; payer + subset of participants.
+- Domain: `src/domain/expenses/expense-types.ts` (`SplitMode`, `SplitValues` on `Expense`), `expense-splits.ts` (validation, percentage-to-MoneyInt rounding, input parsing) + `expense-calculator.ts` (see Expense Calculation section).
+- Repos: `expenses-repository.ts` (`createExpense` + `expense_participants`, `listExpenses`, `updateExpense` which rewrites participants, `deleteExpense` soft). `expenses.split_mode` and `expense_participants.split_value` (basis points for percentages, MoneyInt for exact amounts) are written/read in the same transaction; missing values mean `equal` for old rows.
+- UI: `src/ui/expenses/ExpenseForm.tsx` is a REUSABLE form (description, amount, payer chip, participant checkboxes, reparto chips, per-participant amount/percentage inputs, validation, SearchField) used by both `src/app/juntada/gasto-nuevo.tsx` (modal `?id=`) and `src/app/juntada/gasto-editar.tsx` (modal `?id=&expenseId=`). Expense list + edit/delete actions live in `src/app/juntada/[id].tsx` under the Gastos segment.
 - Editing an expense needs no "recompute" step: settlements are stored payments; balances/transfers are derived at render.
 
 ### 4. Settlements / payments (complete)
@@ -176,7 +176,7 @@ CONTEXT.md         - this file; README.md - developer overview; diseño.md - ori
 - Match (id, getTogetherId, game truco|generala|skull-king|fifa|generic, status active|finished, teamSize for truco, players snapshot with team, timestamps)
 - Game-specific: TrucoRound (team1Points, team2Points), GeneralaEntry (box, points, tachado), SkullKingRoundEntry (round, bid, tricks, bonus), FifaGame (round, slot, players, scores, penalty winner), GenericAdjustment (personId, points)
 
-## Data Model (SQLite, migrations v1–v8)
+## Data Model (SQLite, migrations v1–v9)
 
 Timestamps are INTEGER epoch milliseconds. Soft deletes via `deleted_at` for money/people data; games are hard-deleted (cascade).
 
@@ -225,12 +225,20 @@ v8 (casual games):
 
 - inserts a hidden `get_togethers` row with id `casual` (`CASUAL_GET_TOGETHER_ID`) used only to attach casual matches; `listGetTogethers` filters it out. No schema changes
 
-`position` preserves participant order (it decides who absorbs the split remainder).
+v9 (unequal splits):
+
+- `expenses.split_mode TEXT NOT NULL DEFAULT 'equal'` (`equal` | `exact` | `percentage`)
+- `expense_participants.split_value INTEGER NULL` (MoneyInt for `exact`, basis points `0..10000` for `percentage`; `NULL` for `equal`)
+
+`position` preserves participant order (it decides who absorbs the equal split remainder and breaks percentage-rounding ties).
 
 ## Main Business Rules
 
 - Money stored as integer ARS (no cents)
 - Equal split: remainder distributed to the first participants (index 0..r-1)
+- Exact split: values are integer ARS, non-negative and must sum to `expense.amountInt`
+- Percentage split: values are basis points (`0..10000`, two decimals in the UI) and must sum to `10000`; shares are `floor(amountInt * bps / 10000)` with leftover pesos given to the largest remainders (ties by `position`) so the shares always sum to `amountInt`
+- Invalid or missing split data falls back to an equal split in `calculateShares`, so old rows and corrupted data never break balances
 - Soft delete for people, groups, expenses and settlements (preserve history); games and whole juntadas hard-delete. Deleting a juntada cascades to all its expenses, settlements and matches (FK `ON DELETE CASCADE`); people/groups survive
 - Soft-deleted people never appear as selectable players (pickers use `listPeople`); `listAllPeople` is only for rendering historical match names
 - Active person names are unique, compared with `findPersonWithName` (trim + `normalizeForSearch`)
@@ -238,16 +246,16 @@ v8 (casual games):
 - Applying a group chip (new juntada or casual match) only selects its active members; soft-deleted members are ignored
 - Settlements (registered payments) count as paid for the payer and owed by the receiver, so they cancel pending transfers
 - Participants snapshot per juntada (history does not break if people change)
-- Editing a juntada rewrites `get_together_people` inside a transaction. With `updateExpenses: true`, every active expense's `expense_participants` is rewritten to the new list, so balances/transfers are derived again at render; the payer of each expense is untouched. With `false`, expenses keep their participant snapshot. Rewriting existing expenses is unavailable once the juntada has an active settlement.
+- Editing a juntada rewrites `get_together_people` inside a transaction. With `updateExpenses: true`, every active expense's `expense_participants` is rewritten to the new list, so balances/transfers are derived again at render; the payer of each expense is untouched and any exact/percentage split is reset to `equal` (`split_mode = 'equal'`, `split_value = NULL`). With `false`, expenses keep their participant snapshot and split mode. Rewriting existing expenses is unavailable once the juntada has an active settlement.
 - A person who paid an active expense cannot be removed from the juntada; the edit form disables their checkbox and keeps them selected even when a group chip is applied. A person who only owes a share can be removed; rewriting existing expenses drops their share and recalculates balances.
 - Closing a juntada sets `status = 'closed'` and `closed_at = now`; reopening clears `closed_at` and restores `active`. Both bump `updated_at`, are confirmed in the UI and never touch the hidden casual row. A closed juntada is read-only; the hidden casual row is always `closed` but casual scorekeeping stays editable (guards exempt `CASUAL_GET_TOGETHER_ID`).
 - Casual matches belong to the hidden `casual` get-together; they finish and delete like any other match (no special discard flow)
 
 ## Expense Calculation
 
-All in `src/domain/expenses/expense-calculator.ts`:
+Shares live in `src/domain/expenses/expense-splits.ts` (`validateSplit`, `calculateSplitShares`, `calculatePercentageShares`, `parsePercentageInput`, `formatPercentageInput`, `PERCENTAGE_TOTAL_BPS`); everything else is in `src/domain/expenses/expense-calculator.ts`:
 
-- `calculateShares(expense)`: per-participant amount via `splitEvenly`
+- `calculateShares(expense)`: dispatches by `expense.splitMode`; equal uses `splitEvenly`, exact uses stored MoneyInt, percentage uses deterministic basis-point rounding; falls back to equal on invalid data
 - `calculateBalances(expenses, settlements)`: net = paid - owes (deleted expenses/settlements ignored; a settlement adds to the payer's paid and the receiver's owed)
 - `calculateDirectTransfers(expenses, settlements)`: debtor -> creditor directly against original payers
 - `minimizeTransfers(expenses, settlements)`: default mode
@@ -414,7 +422,7 @@ Typed routes are enabled: use template literals (`/juntada/${id}`) or the `route
 - `diseño.md` - original product requirements (Spanish)
 - `src/domain/expenses/expense-calculator.ts` - splits, balances, transfers
 - `src/domain/common/text-search.ts` - search normalization + matchesQuery
-- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v8 + `CASUAL_GET_TOGETHER_ID`
+- `src/infrastructure/persistence/migrations.ts` - schema versions v1–v9 + `CASUAL_GET_TOGETHER_ID`
 - `src/ui/games/NewMatchForm.tsx` - reusable match setup (juntada + casual flows)
 - `src/app/_layout.tsx` - root layout (SQLiteProvider + ThemeProvider + Stack)
 - `src/app/juntada/[id].tsx` - juntada detail (Liquidación + Gastos | Juegos, edit + delete header)

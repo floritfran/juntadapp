@@ -122,13 +122,17 @@ export async function updateGetTogether(
       await db.runAsync('DELETE FROM expense_participants WHERE expense_id = ?', expense.id);
       for (let position = 0; position < input.participantIds.length; position++) {
         await db.runAsync(
-          'INSERT INTO expense_participants (expense_id, person_id, position) VALUES (?, ?, ?)',
+          'INSERT INTO expense_participants (expense_id, person_id, position, split_value) VALUES (?, ?, ?, NULL)',
           expense.id,
           input.participantIds[position],
           position
         );
       }
-      await db.runAsync('UPDATE expenses SET updated_at = ? WHERE id = ?', now, expense.id);
+      await db.runAsync(
+        "UPDATE expenses SET split_mode = 'equal', updated_at = ? WHERE id = ?",
+        now,
+        expense.id
+      );
     }
   });
 }
