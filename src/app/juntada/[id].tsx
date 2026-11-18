@@ -24,7 +24,12 @@ import { buildSettlementSummaryText } from '@/domain/expenses/settlement-summary
 import { GetTogether } from '@/domain/get-togethers/get-together-types';
 import { Person, PersonId } from '@/domain/people/person-types';
 import { listExpenses, softDeleteExpense } from '@/infrastructure/persistence/expenses-repository';
-import { deleteGetTogether, getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
+import {
+  closeGetTogether,
+  deleteGetTogether,
+  getGetTogether,
+  reopenGetTogether,
+} from '@/infrastructure/persistence/get-togethers-repository';
 import { listAllPeople } from '@/infrastructure/persistence/people-repository';
 import {
   createSettlements,
@@ -60,6 +65,8 @@ export default function JuntadaDetailScreen() {
   const settlingAllRef = useRef(false);
   const [deleting, setDeleting] = useState(false);
   const deletingRef = useRef(false);
+  const [changingStatus, setChangingStatus] = useState(false);
+  const changingStatusRef = useRef(false);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -166,6 +173,41 @@ export default function JuntadaDetailScreen() {
     );
   };
 
+  const confirmToggleStatus = () => {
+    if (!getTogether || changingStatusRef.current) return;
+    const closing = getTogether.status === 'active';
+    Alert.alert(
+      closing ? 'Cerrar juntada' : 'Reabrir juntada',
+      closing
+        ? `¿Cerrar "${getTogether.name}"? No se podrán cargar ni editar gastos, pagos ni partidas hasta que la vuelvas a abrir.`
+        : `¿Reabrir "${getTogether.name}"? Vas a poder volver a cargar y editar gastos, pagos y partidas.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: closing ? 'Cerrar' : 'Reabrir',
+          onPress: async () => {
+            if (changingStatusRef.current) return;
+            changingStatusRef.current = true;
+            setChangingStatus(true);
+            try {
+              if (closing) {
+                await closeGetTogether(db, getTogether.id);
+              } else {
+                await reopenGetTogether(db, getTogether.id);
+              }
+              await load();
+            } catch {
+              Alert.alert('Error', 'No se pudo actualizar el estado de la juntada.');
+            } finally {
+              changingStatusRef.current = false;
+              setChangingStatus(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const settleTransfer = (transfer: Transfer) =>
     router.push({
       pathname: '/juntada/pago-nuevo',
@@ -253,6 +295,8 @@ export default function JuntadaDetailScreen() {
     );
   }
 
+  const readOnly = getTogether.status === 'closed';
+
   const headerContent = (
     <>
       <Card>
@@ -260,20 +304,34 @@ export default function JuntadaDetailScreen() {
           <Text numberOfLines={2} style={styles.title}>
             {getTogether.name}
           </Text>
-          {getTogether.status === 'closed' ? (
+          {readOnly ? (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>Cerrada</Text>
             </View>
           ) : null}
           <Pressable
+            disabled={changingStatus}
             hitSlop={8}
-            onPress={() =>
-              router.push({ pathname: '/juntada/editar', params: { id: getTogether.id } })
-            }
+            onPress={confirmToggleStatus}
             style={styles.iconButton}
           >
-            <Ionicons color={colors.primary} name="pencil-outline" size={20} />
+            <Ionicons
+              color={colors.primary}
+              name={readOnly ? 'lock-open-outline' : 'lock-closed-outline'}
+              size={20}
+            />
           </Pressable>
+          {readOnly ? null : (
+            <Pressable
+              hitSlop={8}
+              onPress={() =>
+                router.push({ pathname: '/juntada/editar', params: { id: getTogether.id } })
+              }
+              style={styles.iconButton}
+            >
+              <Ionicons color={colors.primary} name="pencil-outline" size={20} />
+            </Pressable>
+          )}
           <Pressable
             disabled={deleting}
             hitSlop={8}
@@ -324,6 +382,7 @@ export default function JuntadaDetailScreen() {
           contentContainerStyle={styles.content}
           getTogetherId={id ?? ''}
           header={headerContent}
+          readOnly={readOnly}
         />
       </Screen>
     );
@@ -335,14 +394,16 @@ export default function JuntadaDetailScreen() {
         {headerContent}
         <View style={styles.sectionRow}>
               <SectionTitle style={styles.flex} title="Gastos" />
-              <Button
-                onPress={() =>
-                  router.push({ pathname: '/juntada/gasto-nuevo', params: { id: id ?? '' } })
-                }
-                style={styles.newExpenseButton}
-                title="+ Nuevo"
-                variant="secondary"
-              />
+              {readOnly ? null : (
+                <Button
+                  onPress={() =>
+                    router.push({ pathname: '/juntada/gasto-nuevo', params: { id: id ?? '' } })
+                  }
+                  style={styles.newExpenseButton}
+                  title="+ Nuevo"
+                  variant="secondary"
+                />
+              )}
             </View>
             <Text style={styles.total}>Total gastado: {formatMoney(total)}</Text>
 
@@ -368,25 +429,29 @@ export default function JuntadaDetailScreen() {
                       </Text>
                     </View>
                     <Text style={styles.expenseAmount}>{formatMoney(expense.amountInt)}</Text>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/juntada/gasto-editar',
-                          params: { id: id ?? '', expenseId: expense.id },
-                        })
-                      }
-                      style={styles.iconButton}
-                    >
-                      <Ionicons color={colors.primary} name="pencil-outline" size={20} />
-                    </Pressable>
-                    <Pressable
-                      hitSlop={8}
-                      onPress={() => confirmDeleteExpense(expense)}
-                      style={styles.iconButton}
-                    >
-                      <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                    </Pressable>
+                    {readOnly ? null : (
+                      <>
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() =>
+                            router.push({
+                              pathname: '/juntada/gasto-editar',
+                              params: { id: id ?? '', expenseId: expense.id },
+                            })
+                          }
+                          style={styles.iconButton}
+                        >
+                          <Ionicons color={colors.primary} name="pencil-outline" size={20} />
+                        </Pressable>
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() => confirmDeleteExpense(expense)}
+                          style={styles.iconButton}
+                        >
+                          <Ionicons color={colors.danger} name="trash-outline" size={20} />
+                        </Pressable>
+                      </>
+                    )}
                   </View>
                 </Card>
               ))
@@ -407,13 +472,15 @@ export default function JuntadaDetailScreen() {
                       <Text style={[styles.expenseAmount, styles.settlementAmount]}>
                         {formatMoney(settlement.amountInt)}
                       </Text>
-                      <Pressable
-                        hitSlop={8}
-                        onPress={() => confirmDeleteSettlement(settlement)}
-                        style={styles.iconButton}
-                      >
-                        <Ionicons color={colors.danger} name="trash-outline" size={20} />
-                      </Pressable>
+                      {readOnly ? null : (
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() => confirmDeleteSettlement(settlement)}
+                          style={styles.iconButton}
+                        >
+                          <Ionicons color={colors.danger} name="trash-outline" size={20} />
+                        </Pressable>
+                      )}
                     </View>
                   </Card>
                 ))}
@@ -459,19 +526,21 @@ export default function JuntadaDetailScreen() {
                         {nameOf(transfer.from)} → {nameOf(transfer.to)}
                       </Text>
                       <Text style={styles.transferAmount}>{formatMoney(transfer.amount)}</Text>
-                      <Pressable
-                        hitSlop={8}
-                        onPress={() => settleTransfer(transfer)}
-                        style={styles.settleButton}
-                      >
-                        <Text style={styles.settleButtonText}>Saldar</Text>
-                      </Pressable>
+                      {readOnly ? null : (
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() => settleTransfer(transfer)}
+                          style={styles.settleButton}
+                        >
+                          <Text style={styles.settleButtonText}>Saldar</Text>
+                        </Pressable>
+                      )}
                     </View>
                   ))}
                   <Text style={styles.transferTotal}>
                     Total de transferencias: {transfers.length}
                   </Text>
-                  {transfers.length > 0 ? (
+                  {transfers.length > 0 && !readOnly ? (
                     <Button
                       disabled={settlingAll}
                       loading={settlingAll}

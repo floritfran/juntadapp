@@ -12,6 +12,7 @@ import { Button } from '@/ui/components/Button';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { ExpenseForm, ExpenseFormLoading } from '@/ui/expenses/ExpenseForm';
+import { ClosedGetTogether } from '@/ui/get-togethers/ClosedGetTogether';
 
 export default function EditarGastoScreen() {
   const db = useSQLiteContext();
@@ -52,6 +53,8 @@ export default function EditarGastoScreen() {
       </Screen>
     );
   }
+
+  if (getTogether.status === 'closed') return <ClosedGetTogether />;
 
   return (
     <ExpenseForm

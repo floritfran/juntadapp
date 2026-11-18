@@ -4,13 +4,16 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { GAME_LABELS, Match, MatchStatus } from '@/domain/games/game-types';
+import { getGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
 import { getMatch } from '@/infrastructure/persistence/matches-repository';
+import { CASUAL_GET_TOGETHER_ID } from '@/infrastructure/persistence/migrations';
 import { listAllPeople } from '@/infrastructure/persistence/people-repository';
 import { Button } from '@/ui/components/Button';
 import { Card } from '@/ui/components/Card';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { formatDate } from '@/ui/format';
+import { ClosedGetTogether } from '@/ui/get-togethers/ClosedGetTogether';
 import { FifaScorer } from '@/ui/games/FifaScorer';
 import { GeneralaScorer } from '@/ui/games/GeneralaScorer';
 import { GenericScorer } from '@/ui/games/GenericScorer';
@@ -25,6 +28,7 @@ export default function PartidaScreen() {
   const { match: matchId } = useLocalSearchParams<{ match: string }>();
   const [match, setMatch] = useState<Match | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [closed, setClosed] = useState(false);
   const [nameById, setNameById] = useState<Map<string, string>>(new Map());
 
   const load = useCallback(async () => {
@@ -40,6 +44,11 @@ export default function PartidaScreen() {
       if (!matchResult) {
         setNotFound(true);
       } else {
+        const getTogether =
+          matchResult.getTogetherId === CASUAL_GET_TOGETHER_ID
+            ? null
+            : await getGetTogether(db, matchResult.getTogetherId);
+        setClosed(getTogether?.status === 'closed');
         setMatch(matchResult);
       }
     } catch {
@@ -83,6 +92,8 @@ const nameOf = (personId: string) => nameById.get(personId) ?? 'Persona eliminad
       </Screen>
     );
   }
+
+  if (closed) return <ClosedGetTogether />;
 
   return (
     <Screen>
