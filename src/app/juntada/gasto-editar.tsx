@@ -64,6 +64,8 @@ export default function EditarGastoScreen() {
       initialDescription={expense.description}
       initialParticipantIds={expense.participantIds}
       initialPayerId={expense.payerId}
+      initialSplitMode={expense.splitMode}
+      initialSplitValues={expense.splitValues}
       people={people}
     />
   );

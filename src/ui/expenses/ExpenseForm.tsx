@@ -4,7 +4,8 @@ import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
 import { matchesQuery } from '@/domain/common/text-search';
-import { ExpenseId } from '@/domain/expenses/expense-types';
+import { calculateSplitShares, formatPercentageInput, parsePercentageInput, PERCENTAGE_TOTAL_BPS, validateSplit, type SplitValidationError } from '@/domain/expenses/expense-splits';
+import { ExpenseId, SplitMode, SplitValues } from '@/domain/expenses/expense-types';
 import { GetTogether } from '@/domain/get-togethers/get-together-types';
 import { Person, PersonId } from '@/domain/people/person-types';
 import { createExpense, updateExpense } from '@/infrastructure/persistence/expenses-repository';
@@ -27,6 +28,80 @@ interface ExpenseFormProps {
   initialAmountInt?: number;
   initialPayerId?: PersonId | null;
   initialParticipantIds?: PersonId[];
+  initialSplitMode?: SplitMode | null;
+  initialSplitValues?: SplitValues | null;
+}
+
+function evenBps(count: number): number[] {
+  if (count <= 0) return [];
+  const base = Math.floor(PERCENTAGE_TOTAL_BPS / count);
+  const remainder = PERCENTAGE_TOTAL_BPS % count;
+  return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+function buildSplitInputs(
+  mode: SplitMode,
+  amountInt: number,
+  participantIds: PersonId[],
+  values?: SplitValues | null
+): Record<PersonId, string> {
+  const evenShares = calculateSplitShares('equal', amountInt, participantIds);
+  const percentages = evenBps(participantIds.length);
+  const usableValues =
+    values != null && validateSplit(mode, amountInt, participantIds, values) === null
+      ? values
+      : null;
+
+  return Object.fromEntries(
+    participantIds.map((personId, index) => {
+      if (mode === 'exact') {
+        const value = usableValues?.[personId] ?? evenShares[personId] ?? 0;
+        return [personId, String(value)];
+      }
+      if (mode === 'percentage') {
+        const value = usableValues?.[personId] ?? percentages[index] ?? 0;
+        return [personId, formatPercentageInput(value)];
+      }
+      return [personId, ''];
+    })
+  );
+}
+
+function readSplitValues(
+  mode: SplitMode,
+  participantIds: PersonId[],
+  inputs: Record<PersonId, string>
+): SplitValues {
+  return Object.fromEntries(
+    participantIds.map((personId) => {
+      const text = inputs[personId] ?? '';
+      const value =
+        mode === 'exact'
+          ? parseAmountToInt(text)
+          : parsePercentageInput(text) ?? Number.NaN;
+      return [personId, value];
+    })
+  );
+}
+
+function cleanPercentageText(text: string): string {
+  const [whole, ...decimals] = text.replace(',', '.').split('.');
+  const digits = whole.replace(/\D/g, '').slice(0, 3);
+  if (decimals.length === 0) return digits;
+  return `${digits}.${decimals.join('').replace(/\D/g, '').slice(0, 2)}`;
+}
+
+function splitErrorMessage(mode: SplitMode, error: Exclude<SplitValidationError, null>): string {
+  if (error === 'missing') return 'Ingresá un valor para cada participante.';
+  if (error === 'negative') return 'Los valores no pueden ser negativos.';
+  if (error === 'invalid') {
+    return mode === 'percentage'
+      ? 'Usá porcentajes de 0 a 100 con hasta dos decimales.'
+      : 'Ingresá montos enteros sin centavos.';
+  }
+  return mode === 'percentage'
+    ? 'Los porcentajes deben sumar 100%.'
+    : 'Los montos deben sumar el total del gasto.';
 }
 
 export function ExpenseForm({
@@ -37,6 +112,8 @@ export function ExpenseForm({
   initialAmountInt = 0,
   initialPayerId = null,
   initialParticipantIds,
+  initialSplitMode = 'equal',
+  initialSplitValues = null,
 }: ExpenseFormProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -51,17 +128,61 @@ export function ExpenseForm({
   const [participantIds, setParticipantIds] = useState<PersonId[]>(
     initialParticipantIds ?? getTogether.participantIds
   );
+  const [splitMode, setSplitMode] = useState<SplitMode>(initialSplitMode ?? 'equal');
+  const [splitInputs, setSplitInputs] = useState<Record<PersonId, string>>(() =>
+    buildSplitInputs(
+      initialSplitMode ?? 'equal',
+      initialAmountInt,
+      initialParticipantIds ?? getTogether.participantIds,
+      initialSplitValues
+    )
+  );
   const [saving, setSaving] = useState(false);
   const [personQuery, setPersonQuery] = useState('');
 
   const amountInt = parseAmountToInt(amountText);
+  const splitValues = useMemo(
+    () => (splitMode === 'equal' ? null : readSplitValues(splitMode, participantIds, splitInputs)),
+    [splitMode, participantIds, splitInputs]
+  );
+  const splitError = validateSplit(splitMode, amountInt, participantIds, splitValues);
+  const splitTotal = splitValues
+    ? participantIds.reduce((total, personId) => total + (splitValues[personId] || 0), 0)
+    : 0;
+  const splitSummary =
+    splitMode === 'equal'
+      ? 'La división se reparte en partes iguales entre los participantes.'
+      : !Number.isFinite(splitTotal)
+        ? 'Completá un valor para cada participante.'
+        : splitMode === 'percentage'
+          ? `Porcentajes: ${formatPercentageInput(splitTotal)}% de 100%.`
+          : `Cuotas: ${formatMoney(splitTotal)} de ${formatMoney(amountInt)}.`;
 
   const onAmountChange = (text: string) => setAmountText(groupDigits(text.replace(/\D/g, '')));
 
-  const toggleParticipant = (personId: PersonId) =>
-    setParticipantIds((ids) =>
-      ids.includes(personId) ? ids.filter((id) => id !== personId) : [...ids, personId]
+  const changeSplitMode = (nextMode: SplitMode) => {
+    setSplitMode(nextMode);
+    setSplitInputs(
+      buildSplitInputs(nextMode, amountInt, participantIds, readSplitValues(splitMode, participantIds, splitInputs))
     );
+  };
+
+  const toggleParticipant = (personId: PersonId) => {
+    const removing = participantIds.includes(personId);
+    if (!removing && splitMode !== 'equal') {
+      setSplitInputs((current) => ({ ...current, [personId]: '0' }));
+    }
+    setParticipantIds((ids) =>
+      removing ? ids.filter((id) => id !== personId) : [...ids, personId]
+    );
+  };
+
+  const changeSplitInput = (personId: PersonId, text: string) => {
+    setSplitInputs((current) => ({
+      ...current,
+      [personId]: splitMode === 'exact' ? groupDigits(text.replace(/\D/g, '')) : cleanPercentageText(text),
+    }));
+  };
 
   const submit = async () => {
     if (!description.trim()) {
@@ -80,10 +201,21 @@ export function ExpenseForm({
       Alert.alert('Sin participantes', 'Elegí al menos una persona para este gasto.');
       return;
     }
+    if (splitError !== null) {
+      Alert.alert('Reparto inválido', splitErrorMessage(splitMode, splitError));
+      return;
+    }
     setSaving(true);
     try {
       if (expenseId) {
-        await updateExpense(db, expenseId, { payerId, description, amountInt, participantIds });
+        await updateExpense(db, expenseId, {
+          payerId,
+          description,
+          amountInt,
+          participantIds,
+          splitMode,
+          splitValues,
+        });
       } else {
         await createExpense(db, {
           getTogetherId: getTogether.id,
@@ -91,6 +223,8 @@ export function ExpenseForm({
           description,
           amountInt,
           participantIds,
+          splitMode,
+          splitValues,
         });
       }
       router.back();
@@ -133,8 +267,8 @@ export function ExpenseForm({
         keyboardShouldPersistTaps="handled"
         ListFooterComponent={
           filteredParticipants.length > 0 ? (
-            <Text style={styles.hint}>
-              La división se reparte en partes iguales entre los participantes.
+            <Text style={[styles.hint, splitError !== null && styles.hintError]}>
+              {splitSummary}
             </Text>
           ) : undefined
         }
@@ -173,18 +307,37 @@ export function ExpenseForm({
                   ))}
                 </View>
 
+                <SectionTitle style={styles.section} title="Reparto" />
+                <View style={styles.chipsRow}>
+                  <Chip label="Igualitario" onPress={() => changeSplitMode('equal')} selected={splitMode === 'equal'} />
+                  <Chip label="Montos" onPress={() => changeSplitMode('exact')} selected={splitMode === 'exact'} />
+                  <Chip label="Porcentajes" onPress={() => changeSplitMode('percentage')} selected={splitMode === 'percentage'} />
+                </View>
+
                 <SectionTitle style={styles.section} title="¿Quiénes participan?" />
               </>
             )}
           </>
         }
-        renderItem={({ item: person }) => (
-          <CheckRow
-            checked={participantIds.includes(person.id)}
-            label={person.name}
-            onToggle={() => toggleParticipant(person.id)}
-          />
-        )}
+        renderItem={({ item: person }) => {
+          const checked = participantIds.includes(person.id);
+          return (
+            <View style={styles.participantRow}>
+              <CheckRow checked={checked} label={person.name} onToggle={() => toggleParticipant(person.id)} />
+              {checked && splitMode !== 'equal' ? (
+                <View style={styles.splitInput}>
+                  <TextField
+                    keyboardType={splitMode === 'exact' ? 'number-pad' : 'decimal-pad'}
+                    label={splitMode === 'exact' ? 'Monto ($)' : 'Porcentaje (%)'}
+                    onChangeText={(text) => changeSplitInput(person.id, text)}
+                    placeholder="0"
+                    value={splitInputs[person.id] ?? ''}
+                  />
+                </View>
+              ) : null}
+            </View>
+          );
+        }}
         style={styles.list}
       />
       <View style={styles.footer}>
@@ -242,6 +395,16 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: fontSize.sm,
     marginTop: spacing.md,
+  },
+  hintError: {
+    color: colors.danger,
+  },
+  participantRow: {
+    marginBottom: spacing.sm,
+  },
+  splitInput: {
+    marginLeft: spacing.xl + spacing.md,
+    marginTop: -spacing.sm,
   },
   emptyButton: {
     marginTop: spacing.lg,

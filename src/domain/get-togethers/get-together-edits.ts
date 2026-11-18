@@ -22,5 +22,10 @@ export function reassignExpensesToParticipants(
 ): Expense[] {
   return expenses
     .filter((expense) => !expense.deletedAt)
-    .map((expense) => ({ ...expense, participantIds: [...participantIds] }));
+    .map((expense) => ({
+      ...expense,
+      participantIds: [...participantIds],
+      splitMode: 'equal' as const,
+      splitValues: null,
+    }));
 }

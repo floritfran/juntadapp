@@ -10,6 +10,7 @@ import {
   getGetTogether,
   listGetTogethers,
   reopenGetTogether,
+  updateGetTogether,
 } from '@/infrastructure/persistence/get-togethers-repository';
 import { CASUAL_GET_TOGETHER_ID, migrateDatabase } from '@/infrastructure/persistence/migrations';
 
@@ -119,6 +120,31 @@ function countWhere(sqlite: DatabaseSync, table: string, column: string, value: 
     .get(value) as { count: number };
   return row.count;
 }
+
+describe('updateGetTogether', () => {
+  it('resets unequal splits when rewriting expense participants', async () => {
+    const { sqlite, db } = openMemoryDatabase();
+    await migrateDatabase(db);
+    seed(sqlite);
+    sqlite.prepare("UPDATE expenses SET split_mode = 'percentage' WHERE id = 'e1'").run();
+    sqlite.prepare("UPDATE expense_participants SET split_value = 7000 WHERE expense_id = 'e1' AND person_id = 'p1'").run();
+
+    await updateGetTogether(db, 'gt1', {
+      name: 'Juntada actualizada',
+      participantIds: ['p1', 'p2'],
+      updateExpenses: true,
+    });
+
+    const expense = sqlite
+      .prepare('SELECT split_mode FROM expenses WHERE id = ?')
+      .get('e1') as { split_mode: string };
+    expect(expense.split_mode).toBe('equal');
+    const values = sqlite
+      .prepare('SELECT split_value FROM expense_participants WHERE expense_id = ?')
+      .all('e1') as { split_value: number | null }[];
+    expect(values).toEqual([{ split_value: null }, { split_value: null }]);
+  });
+});
 
 describe('closeGetTogether and reopenGetTogether', () => {
   it('closes a juntada, stores closedAt and reopens it clearing closedAt', async () => {

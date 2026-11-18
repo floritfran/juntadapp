@@ -1,4 +1,4 @@
-import { MoneyInt, splitEvenly } from '../common/Money';
+import { MoneyInt } from '../common/Money';
 import {
   Balance,
   Expense,
@@ -7,16 +7,15 @@ import {
   SettlementInput,
   Transfer,
 } from './expense-types';
+import { calculateSplitShares } from './expense-splits';
 
 export function calculateShares(expense: Expense): Record<PersonId, MoneyInt> {
-  const participants = expense.participantIds;
-  if (participants.length === 0) return {};
-  const shares = splitEvenly(expense.amountInt, participants.length);
-  const out: Record<PersonId, MoneyInt> = {};
-  participants.forEach((pid, idx) => {
-    out[pid] = shares[idx] ?? 0;
-  });
-  return out;
+  return calculateSplitShares(
+    expense.splitMode ?? 'equal',
+    expense.amountInt,
+    expense.participantIds,
+    expense.splitValues
+  );
 }
 
 export function calculateBalances(

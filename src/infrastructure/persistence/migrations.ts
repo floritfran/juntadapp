@@ -207,6 +207,13 @@ INSERT OR IGNORE INTO get_togethers (id, name, date, status, closed_at, created_
 VALUES ('${CASUAL_GET_TOGETHER_ID}', 'Casual', 0, 'closed', NULL, 0, 0);
 `,
   },
+  {
+    version: 9,
+    sql: `
+ALTER TABLE expenses ADD COLUMN split_mode TEXT NOT NULL DEFAULT 'equal';
+ALTER TABLE expense_participants ADD COLUMN split_value INTEGER;
+`,
+  },
 ];
 
 export async function migrateDatabase(db: SQLiteDatabase): Promise<void> {
