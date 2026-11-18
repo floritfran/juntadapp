@@ -4,7 +4,13 @@ import { DatabaseSync } from 'node:sqlite';
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { deleteGetTogether } from '@/infrastructure/persistence/get-togethers-repository';
+import {
+  closeGetTogether,
+  deleteGetTogether,
+  getGetTogether,
+  listGetTogethers,
+  reopenGetTogether,
+} from '@/infrastructure/persistence/get-togethers-repository';
 import { CASUAL_GET_TOGETHER_ID, migrateDatabase } from '@/infrastructure/persistence/migrations';
 
 type SqlParam = string | number | bigint | Uint8Array | null;
@@ -113,6 +119,42 @@ function countWhere(sqlite: DatabaseSync, table: string, column: string, value: 
     .get(value) as { count: number };
   return row.count;
 }
+
+describe('closeGetTogether and reopenGetTogether', () => {
+  it('closes a juntada, stores closedAt and reopens it clearing closedAt', async () => {
+    const { sqlite, db } = openMemoryDatabase();
+    await migrateDatabase(db);
+    seed(sqlite);
+
+    await closeGetTogether(db, 'gt1');
+
+    const closed = await getGetTogether(db, 'gt1');
+    expect(closed?.status).toBe('closed');
+    expect(closed?.closedAt).toBeInstanceOf(Date);
+    expect((await listGetTogethers(db)).find((item) => item.id === 'gt1')?.status).toBe('closed');
+
+    await reopenGetTogether(db, 'gt1');
+
+    const reopened = await getGetTogether(db, 'gt1');
+    expect(reopened?.status).toBe('active');
+    expect(reopened?.closedAt).toBeNull();
+    expect(reopened?.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      closed?.updatedAt.getTime() ?? 0
+    );
+  });
+
+  it('never changes the hidden casual get-together or a missing id', async () => {
+    const { db } = openMemoryDatabase();
+    await migrateDatabase(db);
+
+    await closeGetTogether(db, CASUAL_GET_TOGETHER_ID);
+    await closeGetTogether(db, 'missing');
+
+    const casual = await getGetTogether(db, CASUAL_GET_TOGETHER_ID);
+    expect(casual?.status).toBe('closed');
+    expect(casual?.closedAt).toBeNull();
+  });
+});
 
 describe('deleteGetTogether', () => {
   it('cascade-deletes expenses, settlements, matches and their game data', async () => {

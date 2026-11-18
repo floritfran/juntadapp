@@ -133,6 +133,32 @@ export async function updateGetTogether(
   });
 }
 
+async function setGetTogetherStatus(
+  db: SQLiteDatabase,
+  id: GetTogetherId,
+  status: GetTogetherStatus
+): Promise<void> {
+  const now = Date.now();
+  await db.runAsync(
+    `UPDATE get_togethers
+        SET status = ?, closed_at = ?, updated_at = ?
+      WHERE id = ? AND id <> ?`,
+    status,
+    status === 'closed' ? now : null,
+    now,
+    id,
+    CASUAL_GET_TOGETHER_ID
+  );
+}
+
+export async function closeGetTogether(db: SQLiteDatabase, id: GetTogetherId): Promise<void> {
+  await setGetTogetherStatus(db, id, 'closed');
+}
+
+export async function reopenGetTogether(db: SQLiteDatabase, id: GetTogetherId): Promise<void> {
+  await setGetTogetherStatus(db, id, 'active');
+}
+
 export async function deleteGetTogether(
   db: SQLiteDatabase,
   id: GetTogetherId

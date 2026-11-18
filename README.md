@@ -15,6 +15,8 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - People and friend groups management (create, edit name/members, soft delete)
 - Search people by name (case- and accent-insensitive) in every people list, with a clear (X) button in the search field
 - Create a juntada with participants (manual or from a saved group)
+- Search juntadas by name and filter them by any month/year and participating friends (searchable list; all selected participants must be in the juntada)
+- Close a juntada when the meetup is over and reopen it later; closed juntadas are read-only (no new or edited expenses, payments or matches)
 - Delete a juntada with confirmation; its expenses, registered payments and all played games are removed with it (people and groups are kept)
 - Edit a juntada's name and participants; choose whether existing expenses are re-split among the new participants (not available once a payment has been registered). Unsaved edits are confirmed before leaving. People who paid an expense cannot be removed from the participant list; people who only owe a share can, and balances are recalculated when existing expenses are updated
 - Record expenses: payer, amount, participants
@@ -24,7 +26,7 @@ Mobile app to organize meetups (juntadas): split expenses and keep track of boar
 - Equal split with deterministic integer remainder
 - Settlement: direct payments or debt minimization (default)
 - Share the settlement summary (total + pending transfers) as plain text to WhatsApp or any app
-- Juntadas list with date, participants and total spent
+- Juntadas list with date, participants, total spent and a "Cerrada" badge for closed ones
 - Light/dark theme that follows the device color scheme
 - Haptic feedback on game actions (score, undo, finish) and other confirmations
 - Long lists and player pickers are virtualized (`FlatList`/`SectionList`) for smooth scrolling

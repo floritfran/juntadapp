@@ -17,6 +17,7 @@ import { hasSettlements } from '@/infrastructure/persistence/settlements-reposit
 import { Button } from '@/ui/components/Button';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
+import { ClosedGetTogether } from '@/ui/get-togethers/ClosedGetTogether';
 import {
   GetTogetherForm,
   GetTogetherFormLoading,
@@ -123,6 +124,8 @@ export default function EditarJuntadaScreen() {
       </Screen>
     );
   }
+
+  if (getTogether.status === 'closed') return <ClosedGetTogether />;
 
   return (
     <GetTogetherForm

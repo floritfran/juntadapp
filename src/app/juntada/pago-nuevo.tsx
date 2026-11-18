@@ -11,6 +11,7 @@ import { Button } from '@/ui/components/Button';
 import { EmptyState } from '@/ui/components/EmptyState';
 import { Screen } from '@/ui/components/Screen';
 import { SettlementForm, SettlementFormLoading } from '@/ui/expenses/SettlementForm';
+import { ClosedGetTogether } from '@/ui/get-togethers/ClosedGetTogether';
 import { spacing } from '@/ui/theme';
 
 export default function NuevoPagoScreen() {
@@ -54,6 +55,8 @@ export default function NuevoPagoScreen() {
       </Screen>
     );
   }
+
+  if (getTogether.status === 'closed') return <ClosedGetTogether />;
 
   const amountInt = amount ? parseInt(amount, 10) : 0;
 
